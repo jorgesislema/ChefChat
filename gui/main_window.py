@@ -456,11 +456,21 @@ class MainWindow(QMainWindow):
                 provider=provider,
                 model=self._selected_model
             )
-            self.worker = Worker(orchestrator)
+            historial = [
+                {"rol": "user", "contenido": "Hola"},
+                {"rol": "assistant", "contenido": "¡Hola! Soy ChefChat, tu asistente IA para restaurantes. ¿En qué puedo ayudarte hoy?"}
+            ]
+            self.worker = Worker(
+                orchestrator=orchestrator,
+                message=message,
+                historial=historial,
+                contexto_rag=None
+            )
             self.worker.chunk_recibido.connect(self._on_chunk_received)
             self.worker.requiere_aprobacion.connect(self._on_requires_approval)
             self.worker.accion_completada.connect(self._on_action_completed)
             self.worker.error_occurred.connect(self._on_error)
+            self.worker.respuesta_completada.connect(self._on_respuesta_completada)
             self._pending_action_data = None
             self.worker.start()
         except Exception as e:
@@ -481,6 +491,10 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def _on_chunk_received(self, chunk: str) -> None:
         self._append_assistant_message(chunk)
+
+    @pyqtSlot(str)
+    def _on_respuesta_completada(self, respuesta: str) -> None:
+        self._append_system_message("✅ Respuesta completada")
 
     @pyqtSlot(object)
     def _on_requires_approval(self, accion) -> None:

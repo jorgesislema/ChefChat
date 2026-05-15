@@ -1,5 +1,5 @@
 import threading
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict, Any, List
 from PyQt6.QtCore import QThread, pyqtSignal, pyqtBoundSignal
 from core.models import AccionOffice
 from agents.orchestrator import Orchestrator
@@ -11,30 +11,40 @@ class Worker(QThread):
     requiere_aprobacion: pyqtBoundSignal = pyqtSignal(AccionOffice)
     accion_completada: pyqtBoundSignal = pyqtSignal(str)
     error_occurred: pyqtBoundSignal = pyqtSignal(str)
+    respuesta_completada: pyqtBoundSignal = pyqtSignal(str)
 
     def __init__(
         self,
         orchestrator: Orchestrator,
+        message: str,
+        historial: Optional[List[Dict[str, str]]] = None,
+        contexto_rag: Optional[str] = None,
         parent: Optional["QObject"] = None,
     ) -> None:
         super().__init__(parent)
         self.orchestrator: Orchestrator = orchestrator
+        self.message: str = message
+        self.historial: List[Dict[str, str]] = historial or []
+        self.contexto_rag: Optional[str] = contexto_rag
         self.pause_condition: threading.Event = threading.Event()
         self.pause_condition.set()
         self.accion_pendiente: Optional[AccionOffice] = None
         self.pending_action_data: Optional[Dict[str, Any]] = None
         self.running: bool = True
-        self._streaming_callback: Optional[Callable[[str], None]] = None
         self._is_waiting: bool = False
 
-    def set_streaming_callback(self, callback: Callable[[str], None]) -> None:
-        self._streaming_callback = callback
-
     def run(self) -> None:
-        self.orchestrator.streaming_callback = self._streaming_callback
-        while self.running:
-            if not self.pause_condition.is_set() and self._is_waiting:
-                pass
+        try:
+            historial_completo = self.historial + [{"rol": "user", "contenido": self.message}]
+            respuesta = self.orchestrator.generar_respuesta(
+                historial=historial_completo,
+                contexto_rag=self.contexto_rag
+            )
+            self.chunk_recibido.emit(respuesta)
+            self.respuesta_completada.emit(respuesta)
+        except Exception as e:
+            error_msg = f"Error en LLM: {str(e)}"
+            self.error_occurred.emit(error_msg)
 
     def solicitud_accion(self, accion: AccionOffice) -> None:
         self.accion_pendiente = accion
