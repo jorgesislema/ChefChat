@@ -10,6 +10,7 @@ class AIProvider(Enum):
     GEMINI = "gemini"
     CLAUDE = "claude"
     OPENAI = "openai"
+    OPENCODE = "opencode"
 
 
 class ConfigManager:
@@ -21,6 +22,7 @@ class ConfigManager:
         AIProvider.GEMINI: "gemini_key",
         AIProvider.CLAUDE: "claude_key",
         AIProvider.OPENAI: "openai_key",
+        AIProvider.OPENCODE: "opencode_key",
     }
 
     PROVIDER_NAMES: Dict[AIProvider, str] = {
@@ -29,6 +31,7 @@ class ConfigManager:
         AIProvider.GEMINI: "Google Gemini",
         AIProvider.CLAUDE: "Claude (Anthropic)",
         AIProvider.OPENAI: "OpenAI (GPT-4, GPT-3.5)",
+        AIProvider.OPENCODE: "OpenCode (Big Pickle 🆓)",
     }
 
     PROVIDER_MODELS: Dict[AIProvider, List[str]] = {
@@ -37,6 +40,7 @@ class ConfigManager:
         AIProvider.GEMINI: ["gemini-pro", "gemini-1.5-pro", "gemini-2.0-flash"],
         AIProvider.CLAUDE: ["claude-3-5-sonnet-20240620", "claude-3-opus", "claude-3-haiku"],
         AIProvider.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
+        AIProvider.OPENCODE: ["big-pickle", "open-code-v1", "code-assistant"],
     }
 
     @staticmethod

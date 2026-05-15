@@ -28,6 +28,10 @@ PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
         "base_url": "https://api.openai.com/v1",
         "default_model": "gpt-4o",
     },
+    AIProvider.OPENCODE: {
+        "base_url": "https://opencode.ai/zen/v1",
+        "default_model": "big-pickle",
+    },
 }
 
 
