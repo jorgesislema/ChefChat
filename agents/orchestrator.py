@@ -24,7 +24,7 @@ PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
         "base_url": "https://api.anthropic.com/v1",
         "default_model": "claude-3-5-sonnet-20240620",
     },
-    AIProvider.GPTCHAT: {
+    AIProvider.OPENAI: {
         "base_url": "https://api.openai.com/v1",
         "default_model": "gpt-4o",
     },

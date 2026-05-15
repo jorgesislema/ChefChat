@@ -9,7 +9,7 @@ class AIProvider(Enum):
     DEEPSEEK = "deepseek"
     GEMINI = "gemini"
     CLAUDE = "claude"
-    GPTCHAT = "gptchat"
+    OPENAI = "openai"
 
 
 class ConfigManager:
@@ -20,23 +20,23 @@ class ConfigManager:
         AIProvider.DEEPSEEK: "deepseek_key",
         AIProvider.GEMINI: "gemini_key",
         AIProvider.CLAUDE: "claude_key",
-        AIProvider.GPTCHAT: "gptchat_key",
+        AIProvider.OPENAI: "openai_key",
     }
 
     PROVIDER_NAMES: Dict[AIProvider, str] = {
-        AIProvider.OPENROUTER: "OpenRouter (MiniMax)",
+        AIProvider.OPENROUTER: "OpenRouter (MiniMax, GPT, etc)",
         AIProvider.DEEPSEEK: "DeepSeek",
         AIProvider.GEMINI: "Google Gemini",
         AIProvider.CLAUDE: "Claude (Anthropic)",
-        AIProvider.GPTCHAT: "GPT Chat",
+        AIProvider.OPENAI: "OpenAI (GPT-4, GPT-3.5)",
     }
 
     PROVIDER_MODELS: Dict[AIProvider, List[str]] = {
-        AIProvider.OPENROUTER: ["minimax-2.7b", "openrouter/auto"],
+        AIProvider.OPENROUTER: ["minimax-2.7b", "openrouter/auto", "gpt-4o", "claude-3-5-sonnet"],
         AIProvider.DEEPSEEK: ["deepseek-chat", "deepseek-coder"],
-        AIProvider.GEMINI: ["gemini-pro", "gemini-1.5-pro"],
-        AIProvider.CLAUDE: ["claude-3-5-sonnet-20240620", "claude-3-opus"],
-        AIProvider.GPTCHAT: ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
+        AIProvider.GEMINI: ["gemini-pro", "gemini-1.5-pro", "gemini-2.0-flash"],
+        AIProvider.CLAUDE: ["claude-3-5-sonnet-20240620", "claude-3-opus", "claude-3-haiku"],
+        AIProvider.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
     }
 
     @staticmethod
