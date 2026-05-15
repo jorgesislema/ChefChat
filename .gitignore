@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.mypy_cache/
+*.pyc
+*.db
+*.sqlite
+.env
+logs/
+docs_internos/
+*.log
+C:\Temp\ChefChat_Sandbox\
+*.egg-info/
+dist/
+build/
+*.spec
