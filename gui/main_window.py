@@ -31,6 +31,7 @@ from agents.orchestrator import Orchestrator
 from agents.tools import crear_herramientas_operativas
 from core.config import AIProvider, ConfigManager
 from core.security import SecurityValidator
+from core.rag_classifier import cargar_documentos_rag, generar_resumen_carga
 from data.db_manager import DatabaseManager
 
 
@@ -525,15 +526,48 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def _on_rag_ingest(self) -> None:
+        """
+        Abre diálogo para seleccionar documentos y los clasifica automáticamente.
+        
+        Tipos detectados:
+        - Recetas (CSV con columna Ingredientes)
+        - Catálogo de Inventario (CSV con id_producto, vida_util_dias)
+        - Lotes de Inventario (CSV con id_lote, fecha_ingreso)
+        - Manuales BPM (TXT/MD con palabras clave: procedimiento, paso, bpm)
+        - Genéricos (otros documentos)
+        """
         file_paths, _ = QFileDialog.getOpenFileNames(
             self, "Ingesta RAG - Seleccionar Documentos", "",
             "Documentos (*.csv *.md *.txt);;Todos los archivos (*.*)"
         )
         if file_paths:
+            # Clasificar automáticamente
+            resultados = cargar_documentos_rag(file_paths)
             self._rag_files.extend(file_paths)
-            files_list = ", ".join([p.split("\\")[-1] for p in file_paths])
-            self._append_system_message(f"📚 Documentos cargados: {files_list}")
-            self.viewer_read.append(f"<br>=== RAG CONTEXT LOADED ===<br>Files: {len(self._rag_files)}<br>")
+            
+            # Mostrar resumen detallado
+            resumen = generar_resumen_carga(resultados)
+            self._append_system_message(resumen)
+            
+            # Mostrar en visor derecho
+            self.viewer_read.clear()
+            self.viewer_read.append("<h3>📚 Documentos Cargados</h3>")
+            
+            for doc in resultados["documentos"]:
+                icono = {"receta": "📖", "catalogo_inventario": "📦", 
+                        "lotes_inventario": "📋", "manual_bpm": "📘", 
+                        "generico": "📄"}.get(doc["tipo"], "📄")
+                
+                self.viewer_read.append(
+                    f"<b>{icono} {doc['nombre']}</b><br>"
+                    f"Tipo: {doc['tipo']}<br>"
+                    f"Columnas: {', '.join(doc.get('columnas', [])[:5])}<br>"
+                    f"Filas: {doc.get('filas', 'N/A')}<br>"
+                    f"Tamaño: {doc.get('tamano_bytes', 0)} bytes<br>"
+                    f"{'─' * 40}<br>"
+                )
+            
+            self.viewer_read.moveCursor(QTextCursor.MoveOperation.End)
 
     @pyqtSlot()
     def _on_send_message(self) -> None:
