@@ -36,13 +36,36 @@ PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
 
 
 class Orchestrator:
+    """
+    Orquestador de IA para ChefChat Pro.
+    
+    Maneja la comunicación con proveedores de LLM y ejecuta herramientas
+    basadas en Tool Calling. Incluye system prompt para forzar RAG-only mode.
+    """
+    
+    RAG_ONLY_SYSTEM_PROMPT = """
+Eres ChefChat Pro, un asistente profesional para restaurantes.
+
+REGLAS CRÍTICAS:
+1. SOLO usa información de la base de datos local (SQLite) para recetas.
+2. NUNCA inventes recetas. Si no existe en la DB, di "No encontrada en el sistema".
+3. Para recetas, USA SIEMPRE la herramienta 'buscar_receta_por_nombre'.
+4. Para inventario, usa 'obtener_ingredientes_por_caducar' o 'registrar_uso_inventario'.
+5. Para escalar recetas, usa 'escalar_receta'.
+6. Para reportar problemas, usa 'registrar_incidencia'.
+7. Para análisis de negocio, usa 'analizar_rentabilidad_menu'.
+
+Si el usuario pide una receta que no existe, sugiere usar el botón [+] para cargar nuevos documentos.
+"""
+
     def __init__(
         self,
         provider: Optional[AIProvider] = None,
         model: Optional[str] = None,
         streaming_callback: Optional[Callable[[str], None]] = None,
+        rag_only: bool = True,
     ) -> None:
-        self.provider = provider or ConfigManager.get_configured_provider() or AIProvider.OPENROUTER
+        self.provider = provider or ConfigManager.get_configured_provider() or AIProvider.OPENAI
         self.api_key = ConfigManager.get_api_key(self.provider)
         if not self.api_key:
             raise ValueError(f"No se encontró API Key para {self.provider.value}")
@@ -50,6 +73,7 @@ class Orchestrator:
         self.model_name = model or api_config["default_model"]
         self.base_url = api_config["base_url"]
         self.streaming_callback = streaming_callback
+        self.rag_only = rag_only
         self._setup_llm()
         self.tools: List[Tool] = []
         self._setup_tools()
@@ -101,6 +125,11 @@ class Orchestrator:
         self, historial: List[Dict[str, str]], contexto_rag: Optional[str] = None
     ) -> str:
         messages = []
+        
+        # Agregar system prompt RAG-only si está habilitado
+        if self.rag_only:
+            messages.append(SystemMessage(content=self.RAG_ONLY_SYSTEM_PROMPT))
+        
         if contexto_rag:
             messages.append(
                 SystemMessage(content=f"Contexto de referencia:\n{contexto_rag}")
@@ -110,7 +139,7 @@ class Orchestrator:
                 messages.append(HumanMessage(content=msg["contenido"]))
             elif msg["rol"] == "assistant":
                 messages.append(AIMessage(content=msg["contenido"]))
-        if self.tools and self.provider != AIProvider.GEMINI:
+        if self.tools and self.provider not in [AIProvider.GEMINI, AIProvider.OPENCODE]:
             try:
                 from langchain.agents import AgentExecutor, create_openai_functions_agent
                 prompt = create_openai_functions_agent(self.llm, self.tools)

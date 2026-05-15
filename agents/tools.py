@@ -163,6 +163,63 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
         except Exception as e:
             return f"❌ Error: {str(e)}"
 
+    def _buscar_receta_por_nombre(nombre_receta: str) -> str:
+        """
+        Busca una receta en la base de datos local por nombre o ID.
+        
+        SOLO busca en el RAG local (SQLite), NO usa el LLM para generar recetas.
+        
+        Args:
+            nombre_receta: Nombre o ID de la receta a buscar.
+            
+        Returns:
+            str: Receta encontrada con ingredientes e instrucciones, o error si no existe.
+        """
+        try:
+            cursor = db._get_connection().__enter__()
+            
+            # Intentar buscar por ID primero
+            cursor.execute(
+                "SELECT * FROM recetas WHERE id_receta = ?", (nombre_receta,)
+            )
+            row = cursor.fetchone()
+            
+            # Si no encuentra por ID, buscar por nombre (LIKE)
+            if not row:
+                cursor.execute(
+                    "SELECT * FROM recetas WHERE nombre LIKE ?", (f"%{nombre_receta}%",)
+                )
+                row = cursor.fetchone()
+            
+            if not row:
+                return f"❌ No se encontró la receta '{nombre_receta}' en la base de datos local."
+            
+            receta = dict(row)
+            ingredientes = json.loads(receta["ingredientes_json"])
+            
+            salida = [
+                f"📖 {receta['nombre']}",
+                f"🏷️ Categoría: {receta['categoria']}",
+                f"⏱️ Tiempo: {receta['tiempo_prep']} min",
+                f"💰 Costo: ${receta['costo']:.2f}",
+                "",
+                "🥗 Ingredientes:",
+            ]
+            
+            for ing in ingredientes:
+                salida.append(f"  - {ing['cantidad']} {ing['unidad']} de {ing['nombre']}")
+            
+            if receta.get("alergenos"):
+                salida.append(f"\n⚠️ Alérgenos: {receta['alergenos']}")
+            
+            if receta.get("instrucciones"):
+                salida.append(f"\n📝 Instrucciones:\n{receta['instrucciones']}")
+            
+            return "\n".join(salida)
+            
+        except Exception as e:
+            return f"❌ Error en búsqueda: {str(e)}"
+
     def _analizar_rentabilidad_menu() -> str:
         """
         Analiza la rentabilidad del menú usando matriz BCG.
@@ -215,6 +272,16 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             return f"❌ Error en análisis: {str(e)}"
 
     tools = [
+        Tool(
+            name="buscar_receta_por_nombre",
+            func=_buscar_receta_por_nombre,
+            description="""
+                Busca una receta en la base de datos local (RAG) por nombre o ID.
+                SOLO busca en SQLite, NO genera recetas nuevas.
+                Entrada: nombre_receta (str) - Nombre o ID de la receta
+                Ejemplo: buscar_receta_por_nombre("Pato") o buscar_receta_por_nombre("REC001")
+            """,
+        ),
         Tool(
             name="obtener_ingredientes_por_caducar",
             func=_obtener_ingredientes_por_caducar,
