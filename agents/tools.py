@@ -1,337 +1,304 @@
 """
-Herramientas Operativas para ChefChat Pro - LangChain Tools
+Herramientas Operativas Multi-Agente para ChefChat Pro
 
-Este módulo implementa las 5 herramientas principales que el LLM puede
-ejecutar mediante Tool Calling. Cada herramienta está tipada con Pydantic V2
-para validación estricta de entradas.
+Arquitectura de Agentes:
+├── Agente Inventario: caducidad, stock, compras
+├── Agente Recetas: búsqueda, escalado, sugerencias
+├── Agente Menú: planificación, eventos, anti-desperdicio
+└── Agente Incidencias: bitácora, problemas
 """
 
 from typing import List, Dict, Any, Optional
 from langchain_core.tools import Tool
 from data.db_manager import DatabaseManager
-from core.models import (
-    CaducidadInput, UsoInventarioInput, EscalarRecetaInput,
-    IncidenciaInput, AnalisisRentabilidadOutput
-)
+import json
 
 
 def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
-    """
-    Crea y configura las 5 herramientas operativas para LangChain.
+    """Crea todas las herramientas operativas para LangChain."""
     
-    Args:
-        db: Instancia de DatabaseManager inicializada.
-        
-    Returns:
-        List[Tool]: Lista de herramientas configuradas.
-    """
+    # =========================================================================
+    # AGENTE RECETAS
+    # =========================================================================
     
-    def _obtener_ingredientes_por_caducar(dias_limite: int) -> str:
-        """
-        Consulta ingredientes que caducarán en los próximos días.
-        
-        Usa la Vista_Caducidad para identificar productos cercanos a vencer
-        y aplicar política FEFO (First Expired, First Out).
-        
-        Args:
-            dias_limite: Número de días para la consulta (1-90).
-            
-        Returns:
-            str: JSON con productos por caducar ordenados por urgencia.
-        """
-        try:
-            input_data = CaducidadInput(dias_limite=dias_limite)
-            resultados = db.obtener_ingredientes_por_caducar(input_data.dias_limite)
-            
-            if not resultados:
-                return f"No hay ingredientes por caducar en los próximos {dias_limite} días."
-            
-            salida = []
-            for item in resultados:
-                salida.append({
-                    "producto": item.producto_nombre,
-                    "categoria": item.categoria,
-                    "cantidad_disponible": f"{item.cantidad} {item.unidad}",
-                    "fecha_caducidad": item.fecha_caducidad_efectiva.isoformat(),
-                    "dias_restantes": item.dias_restantes,
-                    "prioridad": "CRÍTICA" if item.dias_restantes <= 2 else "ALTA" if item.dias_restantes <= 5 else "MEDIA"
-                })
-            
-            return f"Ingredientes por caducar ({len(salida)} encontrados):\n" + "\n".join(
-                f"- {i['producto']}: {i['dias_restantes']} días restantes ({i['prioridad']})" 
-                for i in salida
-            )
-            
-        except Exception as e:
-            return f"Error al consultar caducidad: {str(e)}"
-
-    def _registrar_uso_inventario(nombre_item: str, cantidad_usada: float) -> str:
-        """
-        Registra el uso de un ingrediente del inventario.
-        
-        Aplica política FEFO descontando primero del lote más antiguo.
-        
-        Args:
-            nombre_item: Nombre del producto (ej. "Fresa", "Pollo").
-            cantidad_usada: Cantidad a descontar (debe ser > 0).
-            
-        Returns:
-            str: Confirmación del uso registrado o error.
-        """
-        try:
-            input_data = UsoInventarioInput(
-                nombre_item=nombre_item,
-                cantidad_usada=cantidad_usada
-            )
-            resultado = db.registrar_uso_inventario(
-                input_data.nombre_item,
-                input_data.cantidad_usada
-            )
-            return f"✅ {resultado}"
-            
-        except ValueError as e:
-            return f"⚠️ {str(e)}"
-        except Exception as e:
-            return f"❌ Error: {str(e)}"
-
-    def _escalar_receta(receta_id: int, comensales: int) -> str:
-        """
-        Escala matemáticamente una receta para nuevo número de comensales.
-        
-        Multiplica todos los ingredientes por el factor de escala:
-        factor = comensales_nuevos / comensales_originales
-        
-        Args:
-            receta_id: ID de la receta en la base de datos.
-            comensales: Número de comensales deseado.
-            
-        Returns:
-            str: Receta escalada con ingredientes ajustados.
-        """
-        try:
-            input_data = EscalarRecetaInput(
-                receta_id=receta_id,
-                comensales=comensales
-            )
-            receta = db.escalar_receta(input_data.receta_id, input_data.comensales)
-            
-            salida = [
-                f"📖 Receta: {receta['nombre']}",
-                f"👥 Escala: {receta['comensales_originales']} → {receta['comensales_nuevos']} comensales",
-                f"🔢 Factor: {receta['factor_escala']}x",
-                "",
-                "🥗 Ingredientes escalados:"
-            ]
-            
-            for ing in receta["ingredientes"]:
-                salida.append(f"  - {ing['nombre']}: {ing['cantidad']} {ing['unidad']}")
-            
-            salida.append(f"\n💰 Costo estimado: ${receta['costo_produccion_estimado']:.2f}")
-            
-            return "\n".join(salida)
-            
-        except ValueError as e:
-            return f"⚠️ {str(e)}"
-        except Exception as e:
-            return f"❌ Error: {str(e)}"
-
-    def _registrar_incidencia(categoria: str, descripcion: str) -> str:
-        """
-        Registra una incidencia en la bitácora diaria.
-        
-        Categorías válidas: Operativa, Calidad, Inventario, Venta,
-        Mantenimiento, Personal, Proveedor, Otro.
-        
-        Args:
-            categoria: Categoría de la incidencia.
-            descripcion: Descripción detallada (10-500 caracteres).
-            
-        Returns:
-            str: Confirmación del registro.
-        """
-        try:
-            input_data = IncidenciaInput(
-                categoria=categoria,
-                descripcion=descripcion
-            )
-            id_registro = db.registrar_incidencia(
-                input_data.categoria,
-                input_data.descripcion
-            )
-            return f"✅ Incidencia registrada (ID: {id_registro}) - Categoría: {categoria}"
-            
-        except Exception as e:
-            return f"❌ Error: {str(e)}"
-
-    def _buscar_receta_por_nombre(nombre_receta: str) -> str:
-        """
-        Busca una receta en la base de datos local por nombre o ID.
-        
-        SOLO busca en el RAG local (SQLite), NO usa el LLM para generar recetas.
-        
-        Args:
-            nombre_receta: Nombre o ID de la receta a buscar.
-            
-        Returns:
-            str: Receta encontrada con ingredientes e instrucciones, o error si no existe.
-        """
+    def _buscar_receta(nombre_o_id: str) -> str:
+        """Busca receta por nombre o ID en SQLite."""
         try:
             cursor = db._get_connection().__enter__()
-            
-            # Intentar buscar por ID primero
-            cursor.execute(
-                "SELECT * FROM recetas WHERE id_receta = ?", (nombre_receta,)
-            )
+            cursor.execute("SELECT * FROM recetas WHERE id_receta = ?", (nombre_o_id,))
             row = cursor.fetchone()
-            
-            # Si no encuentra por ID, buscar por nombre (LIKE)
             if not row:
-                cursor.execute(
-                    "SELECT * FROM recetas WHERE nombre LIKE ?", (f"%{nombre_receta}%",)
-                )
+                cursor.execute("SELECT * FROM recetas WHERE LOWER(nombre) LIKE LOWER(?)", (f"%{nombre_o_id}%",))
                 row = cursor.fetchone()
-            
             if not row:
-                return f"❌ No se encontró la receta '{nombre_receta}' en la base de datos local."
+                return f"❌ Receta '{nombre_o_id}' no encontrada."
             
             receta = dict(row)
             ingredientes = json.loads(receta["ingredientes_json"])
-            
-            salida = [
-                f"📖 {receta['nombre']}",
-                f"🏷️ Categoría: {receta['categoria']}",
-                f"⏱️ Tiempo: {receta['tiempo_prep']} min",
-                f"💰 Costo: ${receta['costo']:.2f}",
-                "",
-                "🥗 Ingredientes:",
-            ]
-            
+            lineas = [f"📖 {receta['nombre']} (ID: {receta['id_receta']})",
+                     f"🏷️ {receta['categoria']} | ⏱️ {receta['tiempo_prep']} min | 💰 ${receta['costo']:.2f}",
+                     "", "🥗 Ingredientes:"]
             for ing in ingredientes:
-                salida.append(f"  - {ing['cantidad']} {ing['unidad']} de {ing['nombre']}")
-            
+                lineas.append(f"  - {ing['cantidad']} {ing['unidad']} {ing['nombre']}")
             if receta.get("alergenos"):
-                salida.append(f"\n⚠️ Alérgenos: {receta['alergenos']}")
-            
+                lineas.append(f"\n⚠️ Alérgenos: {receta['alergenos']}")
             if receta.get("instrucciones"):
-                salida.append(f"\n📝 Instrucciones:\n{receta['instrucciones']}")
-            
-            return "\n".join(salida)
-            
+                lineas.append(f"\n📝 {receta['instrucciones']}")
+            return "\n".join(lineas)
         except Exception as e:
-            return f"❌ Error en búsqueda: {str(e)}"
+            return f"❌ Error: {str(e)}"
 
-    def _analizar_rentabilidad_menu() -> str:
-        """
-        Analiza la rentabilidad del menú usando matriz BCG.
-        
-        Clasifica cada receta en:
-        - 🌟 Estrellas: Alto margen (>40%), Alta venta (>10)
-        - 🐮 Vacas: Alto margen, Baja venta
-        - ❓ Interrogantes: Bajo margen, Alta venta
-        - 🐶 Perros: Bajo margen, Baja venta
-        
-        Returns:
-            str: Reporte completo de rentabilidad.
-        """
+    def _escalar_receta(receta_id: str, comensales: int) -> str:
+        """Escala receta para N comensales."""
+        try:
+            cursor = db._get_connection().__enter__()
+            cursor.execute("SELECT * FROM recetas WHERE id_receta = ? OR LOWER(nombre) LIKE LOWER(?)",
+                          (receta_id, f"%{receta_id}%"))
+            row = cursor.fetchone()
+            if not row:
+                return f"❌ Receta no encontrada"
+            
+            receta = dict(row)
+            ingredientes = json.loads(receta["ingredientes_json"])
+            comensales_orig = receta.get("comensales", 1)
+            factor = comensales / comensales_orig if comensales_orig > 0 else 1
+            
+            lineas = [f"📖 {receta['nombre']} - ESCALADA",
+                     f"👥 {comensales_orig} → {comensales} comensales (factor: {factor:.2f}x)",
+                     "", "🥗 Ingredientes ajustados:"]
+            for ing in ingredientes:
+                cantidad_nueva = round(ing["cantidad"] * factor, 2)
+                lineas.append(f"  - {cantidad_nueva} {ing['unidad']} {ing['nombre']}")
+            lineas.append(f"\n💰 Costo estimado: ${receta['costo'] * factor:.2f}")
+            return "\n".join(lineas)
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+    def _sugerir_recetas_con_ingrediente(ingrediente: str) -> str:
+        """Busca recetas que contienen un ingrediente específico."""
+        try:
+            cursor = db._get_connection().__enter__()
+            cursor.execute("""
+                SELECT nombre, categoria, tiempo_prep, costo, ingredientes_json
+                FROM recetas
+                WHERE LOWER(ingredientes_json) LIKE LOWER(?)
+                LIMIT 10
+            """, (f"%{ingrediente}%",))
+            rows = cursor.fetchall()
+            if not rows:
+                return f"❌ No hay recetas con '{ingrediente}'"
+            
+            lineas = [f"📖 Recetas con '{ingrediente}':"]
+            for row in rows:
+                lineas.append(f"  - {row[0]} ({row[1]}) - {row[2]} min, ${row[3]:.2f}")
+            return "\n".join(lineas)
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+    # =========================================================================
+    # AGENTE INVENTARIO
+    # =========================================================================
+    
+    def _productos_por_caducar(dias: int = 3) -> str:
+        """Lista productos que caducan en N días."""
+        try:
+            cursor = db._get_connection().__enter__()
+            cursor.execute("""
+                SELECT nombre_producto, cantidad_actual, unidad, dias_restantes, categoria
+                FROM vista_caducidad_activa
+                WHERE dias_restantes >= 0 AND dias_restantes <= ?
+                ORDER BY dias_restantes ASC
+            """, (dias,))
+            rows = cursor.fetchall()
+            if not rows:
+                return f"✅ No hay productos por caducar en {dias} días."
+            
+            lineas = [f"⚠️ CADUCAN EN {dias} DÍAS:"]
+            for row in rows:
+                prioridad = "🔴" if row[3] <= 1 else "🟡" if row[3] <= 3 else "🟢"
+                lineas.append(f"{prioridad} {row[0]}: {row[1]} {row[2]} ({row[3]} días) - {row[4]}")
+            return "\n".join(lineas)
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+    def _verificar_stock_bajo(umbral: float = 10.0) -> str:
+        """Verifica productos con stock bajo."""
+        try:
+            cursor = db._get_connection().__enter__()
+            cursor.execute("""
+                SELECT c.nombre, SUM(l.cantidad_actual) as total, l.unidad
+                FROM lotes_inventario l
+                JOIN catalogo_inventario c ON l.producto_id = c.id_producto
+                GROUP BY c.nombre, l.unidad
+                HAVING total < ?
+                ORDER BY total ASC
+            """, (umbral,))
+            rows = cursor.fetchall()
+            if not rows:
+                return f"✅ Todo el inventario está sobre {umbral} unidades."
+            
+            lineas = ["⚠️ STOCK BAJO:"]
+            for row in rows:
+                lineas.append(f"  🔴 {row[0]}: {row[1]} {row[2]} (umbral: {umbral})")
+            return "\n".join(lineas)
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+    def _registrar_uso_inventario(nombre_item: str, cantidad: float) -> str:
+        """Registra uso de inventario (FEFO)."""
+        try:
+            resultado = db.registrar_uso_inventario(nombre_item, cantidad)
+            return f"✅ {resultado}"
+        except ValueError as e:
+            return f"⚠️ {str(e)}"
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+    # =========================================================================
+    # AGENTE MENÚ
+    # =========================================================================
+    
+    def _menu_anti_desperdicio() -> str:
+        """Sugiere menú para usar productos por caducar."""
+        try:
+            cursor = db._get_connection().__enter__()
+            cursor.execute("""
+                SELECT nombre_producto, cantidad_actual, unidad, dias_restantes
+                FROM vista_caducidad_activa
+                WHERE dias_restantes >= 0 AND dias_restantes <= 5
+                ORDER BY dias_restantes ASC
+                LIMIT 10
+            """)
+            productos = cursor.fetchall()
+            if not productos:
+                return "✅ No hay productos críticos. Inventario en buen estado."
+            
+            lineas = ["💡 MENÚ ANTI-DESPERDICIO", "=" * 40, "",
+                     "🔴 Productos a usar urgente:"]
+            for prod in productos:
+                lineas.append(f"  - {prod[0]}: {prod[1]} {prod[2]} ({prod[3]} días)")
+            
+            lineas.extend(["", "📖 Recetas sugeridas:"])
+            for prod in productos[:5]:
+                nombre_corto = prod[0].lower().split()[0]
+                cursor.execute("""
+                    SELECT nombre, categoria, tiempo_prep FROM recetas
+                    WHERE LOWER(ingredientes_json) LIKE ? LIMIT 3
+                """, (f"%{nombre_corto}%",))
+                recetas = cursor.fetchall()
+                if recetas:
+                    lineas.append(f"\n  Para {prod[0]}:")
+                    for r in recetas:
+                        lineas.append(f"    • {r[0]} ({r[1]}) - {r[2]} min")
+            return "\n".join(lineas)
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+    def _generar_lista_compras(recetas_csv: str, comensales: int = 1) -> str:
+        """Genera lista de compras para evento."""
+        try:
+            cursor = db._get_connection().__enter__()
+            ids = [r.strip() for r in recetas_csv.split(",")]
+            ingredientes_totales = {}
+            
+            for receta_id in ids:
+                cursor.execute("""
+                    SELECT nombre, ingredientes_json, comensales FROM recetas
+                    WHERE id_receta = ? OR LOWER(nombre) LIKE LOWER(?)
+                """, (receta_id, f"%{receta_id}%"))
+                row = cursor.fetchone()
+                if not row:
+                    continue
+                
+                nombre_receta, ingredientes_json, comensales_base = row
+                ingredientes = json.loads(ingredientes_json)
+                factor = comensales / comensales_base if comensales_base > 0 else 1
+                
+                for ing in ingredientes:
+                    key = f"{ing['nombre']}_{ing['unidad']}"
+                    if key not in ingredientes_totales:
+                        ingredientes_totales[key] = {"nombre": ing["nombre"], "cantidad": 0,
+                                                     "unidad": ing["unidad"], "recetas": []}
+                    ingredientes_totales[key]["cantidad"] += ing["cantidad"] * factor
+                    ingredientes_totales[key]["recetas"].append(nombre_receta)
+            
+            if not ingredientes_totales:
+                return f"❌ No se encontraron recetas: {recetas_csv}"
+            
+            lineas = ["🛒 LISTA DE COMPRAS - EVENTO", "=" * 40,
+                     f"👥 Comensales: {comensales}", f"📖 Recetas: {', '.join(ids)}",
+                     "", "📋 Ingredientes:"]
+            for ing in sorted(ingredientes_totales.values(), key=lambda x: x["nombre"]):
+                lineas.append(f"  □ {ing['cantidad']:.2f} {ing['unidad']} {ing['nombre']}")
+                lineas.append(f"    Para: {', '.join(set(ing['recetas']))}")
+            
+            lineas.extend(["", "💡 Tips:",
+                          "  1. Verifica inventario antes de comprar",
+                          "  2. Usa productos próximos a caducar",
+                          "  3. Agrega 10% margen de seguridad"])
+            return "\n".join(lineas)
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+    # =========================================================================
+    # AGENTE INCIDENCIAS
+    # =========================================================================
+    
+    def _registrar_incidencia(categoria: str, descripcion: str) -> str:
+        """Registra incidencia en bitácora."""
+        try:
+            id_reg = db.registrar_incidencia(categoria, descripcion)
+            return f"✅ Incidencia registrada (ID: {id_reg}) - {categoria}"
+        except Exception as e:
+            return f"❌ Error: {str(e)}"
+
+    def _analizar_rentabilidad() -> str:
+        """Analiza rentabilidad del menú (matriz BCG)."""
         try:
             resultado = db.analizar_rentabilidad_menu()
-            output = AnalisisRentabilidadOutput(**resultado)
-            
-            lineas = ["📊 ANÁLISIS DE RENTABILIDAD DEL MENÚ", "=" * 40, ""]
-            
-            if output.estrellas:
-                lineas.append("🌟 ESTRELLAS (Alto margen, Alta venta):")
-                for item in output.estrellas:
-                    lineas.append(f"  - {item['nombre']}: {item['unidades_vendidas']} ventas, {item['margen_promedio']}% margen")
-                lineas.append("")
-            
-            if output.vacas:
-                lineas.append("🐮 VACAS (Alto margen, Baja venta):")
-                for item in output.vacas:
-                    lineas.append(f"  - {item['nombre']}: {item['unidades_vendidas']} ventas, {item['margen_promedio']}% margen")
-                lineas.append("")
-            
-            if output.interrogantes:
-                lineas.append("❓ INTERROGANTES (Bajo margen, Alta venta):")
-                for item in output.interrogantes:
-                    lineas.append(f"  - {item['nombre']}: {item['unidades_vendidas']} ventas, {item['margen_promedio']}% margen")
-                lineas.append("")
-            
-            if output.perros:
-                lineas.append("🐶 PERROS (Bajo margen, Baja venta):")
-                for item in output.perros:
-                    lineas.append(f"  - {item['nombre']}: {item['unidades_vendidas']} ventas, {item['margen_promedio']}% margen")
-                lineas.append("")
-            
-            lineas.append("=" * 40)
-            lineas.append(output.resumen)
-            
+            lineas = ["📊 RENTABILIDAD DEL MENÚ", "=" * 40]
+            for categoria in ["estrellas", "vacas", "interrogantes", "perros"]:
+                items = resultado.get(categoria, [])
+                if items:
+                    icono = {"estrellas": "🌟", "vacas": "🐮", "interrogantes": "❓", "perros": "🐶"}[categoria]
+                    lineas.append(f"\n{icono} {categoria.upper()}:")
+                    for item in items[:5]:
+                        lineas.append(f"  - {item['nombre']}: {item['unidades_vendidas']} ventas, {item['margen_promedio']}% margen")
+            lineas.extend(["", "=" * 40, resultado.get("resumen", "")])
             return "\n".join(lineas)
-            
         except Exception as e:
-            return f"❌ Error en análisis: {str(e)}"
+            return f"❌ Error: {str(e)}"
 
-    tools = [
-        Tool(
-            name="buscar_receta_por_nombre",
-            func=_buscar_receta_por_nombre,
-            description="""
-                Busca una receta en la base de datos local (RAG) por nombre o ID.
-                SOLO busca en SQLite, NO genera recetas nuevas.
-                Entrada: nombre_receta (str) - Nombre o ID de la receta
-                Ejemplo: buscar_receta_por_nombre("Pato") o buscar_receta_por_nombre("REC001")
-            """,
-        ),
-        Tool(
-            name="obtener_ingredientes_por_caducar",
-            func=_obtener_ingredientes_por_caducar,
-            description="""
-                Consulta ingredientes que caducarán en los próximos N días.
-                Usa política FEFO para identificar productos urgentes.
-                Entrada: dias_limite (int, 1-90)
-                Ejemplo: obtener_ingredientes_por_caducar(5)
-            """,
-        ),
-        Tool(
-            name="registrar_uso_inventario",
-            func=_registrar_uso_inventario,
-            description="""
-                Registra el uso de un ingrediente del inventario.
-                Descuenta del lote más antiguo (FEFO).
-                Entrada: nombre_item (str), cantidad_usada (float)
-                Ejemplo: registrar_uso_inventario("Fresa", 2.5)
-            """,
-        ),
-        Tool(
-            name="escalar_receta",
-            func=_escalar_receta,
-            description="""
-                Escala matemáticamente una receta para N comensales.
-                Multiplica ingredientes por factor de escala.
-                Entrada: receta_id (int), comensales (int)
-                Ejemplo: escalar_receta(1, 50)
-            """,
-        ),
-        Tool(
-            name="registrar_incidencia",
-            func=_registrar_incidencia,
-            description="""
-                Registra una incidencia en bitácora diaria.
-                Categorías: Operativa, Calidad, Inventario, Venta, etc.
-                Entrada: categoria (str), descripcion (str)
-                Ejemplo: registrar_incidencia("Inventario", "Falta leche")
-            """,
-        ),
-        Tool(
-            name="analizar_rentabilidad_menu",
-            func=_analizar_rentabilidad_menu,
-            description="""
-                Analiza rentabilidad del menú con matriz BCG.
-                Clasifica en: Estrellas, Vacas, Interrogantes, Perros.
-                No requiere parámetros.
-                Ejemplo: analizar_rentabilidad_menu()
-            """,
-        ),
-    ]
+    # =========================================================================
+    # LISTA DE HERRAMIENTAS
+    # =========================================================================
     
-    return tools
+    return [
+        # Agente Recetas
+        Tool(name="buscar_receta", func=_buscar_receta,
+             description="Busca receta por nombre o ID. Input: nombre_o_id (str). Ej: 'Pato' o 'REC001'"),
+        Tool(name="escalar_receta", func=_escalar_receta,
+             description="Escala receta para N comensales. Input: receta_id, comensales. Ej: 'REC001', 50"),
+        Tool(name="buscar_recetas_con_ingrediente", func=_sugerir_recetas_con_ingrediente,
+             description="Busca recetas con ingrediente. Input: ingrediente (str). Ej: 'pollo'"),
+        
+        # Agente Inventario
+        Tool(name="productos_por_caducar", func=_productos_por_caducar,
+             description="Productos que caducan en N días. Input: dias (int). Ej: 3"),
+        Tool(name="verificar_stock_bajo", func=_verificar_stock_bajo,
+             description="Productos con stock bajo. Input: umbral (float, opcional). Ej: 10"),
+        Tool(name="registrar_uso_inventario", func=_registrar_uso_inventario,
+             description="Registra uso de ingrediente. Input: nombre_item, cantidad. Ej: 'Fresa', 2.5"),
+        
+        # Agente Menú
+        Tool(name="menu_anti_desperdicio", func=_menu_anti_desperdicio,
+             description="Sugiere menú para usar productos por caducar. Sin input."),
+        Tool(name="generar_lista_compras", func=_generar_lista_compras,
+             description="Lista compras para evento. Input: recetas_csv, comensales. Ej: 'REC001,REC002', 50"),
+        
+        # Agente Incidencias
+        Tool(name="registrar_incidencia", func=_registrar_incidencia,
+             description="Registra incidencia. Input: categoria, descripcion. Ej: 'Inventario', 'Falta leche'"),
+        Tool(name="analizar_rentabilidad", func=_analizar_rentabilidad,
+             description="Analiza rentabilidad del menú. Sin input."),
+    ]
