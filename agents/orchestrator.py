@@ -18,7 +18,7 @@ PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
     },
     AIProvider.GEMINI: {
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
-        "default_model": "gemini-pro",
+        "default_model": "gemini-1.5-flash",
     },
     AIProvider.CLAUDE: {
         "base_url": "https://api.anthropic.com/v1",
@@ -37,25 +37,24 @@ PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
 
 class Orchestrator:
     """
-    Orquestador de IA para ChefChat Pro.
+    Orchestrator for ChefChat Pro with Telemetry Support.
     
-    Maneja la comunicación con proveedores de LLM y ejecuta herramientas
-    basadas en Tool Calling. Incluye system prompt para forzar RAG-only mode.
+    Handles LLM communication with automatic usage tracking and cost calculation.
     """
     
     RAG_ONLY_SYSTEM_PROMPT = """
-Eres ChefChat Pro, un asistente profesional para restaurantes.
+You are ChefChat Pro, a professional restaurant assistant.
 
-REGLAS CRÍTICAS:
-1. SOLO usa información de la base de datos local (SQLite) para recetas.
-2. NUNCA inventes recetas. Si no existe en la DB, di "No encontrada en el sistema".
-3. Para recetas, USA SIEMPRE la herramienta 'buscar_receta_por_nombre'.
-4. Para inventario, usa 'obtener_ingredientes_por_caducar' o 'registrar_uso_inventario'.
-5. Para escalar recetas, usa 'escalar_receta'.
-6. Para reportar problemas, usa 'registrar_incidencia'.
-7. Para análisis de negocio, usa 'analizar_rentabilidad_menu'.
+CRITICAL RULES:
+1. ONLY use local SQLite database for recipes.
+2. NEVER invent recipes. If not in DB, say "Not found in system".
+3. For recipes, ALWAYS use 'buscar_receta_por_nombre' tool.
+4. For inventory, use 'obtener_ingredientes_por_caducar' or 'registrar_uso_inventario'.
+5. For scaling recipes, use 'escalar_receta'.
+6. For reporting issues, use 'registrar_incidencia'.
+7. For business analysis, use 'analizar_rentabilidad_menu'.
 
-Si el usuario pide una receta que no existe, sugiere usar el botón [+] para cargar nuevos documentos.
+If user requests a recipe not found, suggest using [+] button to load new documents.
 """
 
     def __init__(
@@ -64,16 +63,18 @@ Si el usuario pide una receta que no existe, sugiere usar el botón [+] para car
         model: Optional[str] = None,
         streaming_callback: Optional[Callable[[str], None]] = None,
         rag_only: bool = True,
+        db_manager=None,  # For telemetry logging
     ) -> None:
         self.provider = provider or ConfigManager.get_configured_provider() or AIProvider.OPENAI
         self.api_key = ConfigManager.get_api_key(self.provider)
         if not self.api_key:
-            raise ValueError(f"No se encontró API Key para {self.provider.value}")
+            raise ValueError(f"No API Key found for {self.provider.value}")
         api_config = PROVIDER_API_CONFIGS[self.provider]
         self.model_name = model or api_config["default_model"]
         self.base_url = api_config["base_url"]
         self.streaming_callback = streaming_callback
         self.rag_only = rag_only
+        self.db_manager = db_manager  # For telemetry
         self._setup_llm()
         self.tools: List[Tool] = []
         self._setup_tools()
@@ -124,32 +125,95 @@ Si el usuario pide una receta que no existe, sugiere usar el botón [+] para car
     def generar_respuesta(
         self, historial: List[Dict[str, str]], contexto_rag: Optional[str] = None
     ) -> str:
+        import time
+        start_time = time.time()
+        
         messages = []
         
-        # Agregar system prompt RAG-only si está habilitado
+        # Add RAG-only system prompt if enabled
         if self.rag_only:
             messages.append(SystemMessage(content=self.RAG_ONLY_SYSTEM_PROMPT))
         
         if contexto_rag:
             messages.append(
-                SystemMessage(content=f"Contexto de referencia:\n{contexto_rag}")
+                SystemMessage(content=f"Reference context:\n{contexto_rag}")
             )
         for msg in historial:
             if msg["rol"] == "user":
                 messages.append(HumanMessage(content=msg["contenido"]))
             elif msg["rol"] == "assistant":
                 messages.append(AIMessage(content=msg["contenido"]))
-        if self.tools and self.provider not in [AIProvider.GEMINI, AIProvider.OPENCODE]:
+        
+        input_tokens = 0
+        output_tokens = 0
+        success = True
+        respuesta = ""
+        
+        try:
+            if self.tools and self.provider not in [AIProvider.GEMINI, AIProvider.OPENCODE]:
+                try:
+                    from langchain.agents import AgentExecutor, create_openai_functions_agent
+                    prompt = create_openai_functions_agent(self.llm, self.tools)
+                    agent_executor = AgentExecutor(agent=prompt, tools=self.tools)
+                    result = agent_executor.invoke({"input": historial[-1]["contenido"]})
+                    respuesta = result.get("output", "")
+                    
+                    # Try to extract usage from agent result if available
+                    if hasattr(result, "intermediate_steps"):
+                        for step in result.intermediate_steps:
+                            if hasattr(step[1], "response_metadata"):
+                                metadata = step[1].response_metadata
+                                if "token_usage" in metadata:
+                                    usage = metadata["token_usage"]
+                                    input_tokens = usage.get("prompt_tokens", 0)
+                                    output_tokens = usage.get("completion_tokens", 0)
+                except Exception:
+                    pass
+            
+            if not respuesta:
+                respuesta = self.llm.invoke(messages)
+                
+                # Extract usage from response
+                if hasattr(respuesta, "response_metadata"):
+                    metadata = respuesta.response_metadata
+                    if "token_usage" in metadata:
+                        usage = metadata["token_usage"]
+                        input_tokens = usage.get("prompt_tokens", 0)
+                        output_tokens = usage.get("completion_tokens", 0)
+                    elif "usage" in metadata:
+                        usage = metadata["usage"]
+                        input_tokens = usage.get("prompt_tokens", 0)
+                        output_tokens = usage.get("completion_tokens", 0)
+                
+                respuesta = respuesta.content if hasattr(respuesta, "content") else str(respuesta)
+            
+        except Exception as e:
+            success = False
+            respuesta = f"Error: {str(e)}"
+        
+        # Calculate duration
+        duration = time.time() - start_time
+        
+        # Calculate cost
+        from agents.tools import calculate_cost
+        costo_usd = calculate_cost(self.model_name, input_tokens, output_tokens)
+        
+        # Log to telemetry (async/silent)
+        if self.db_manager and success:
             try:
-                from langchain.agents import AgentExecutor, create_openai_functions_agent
-                prompt = create_openai_functions_agent(self.llm, self.tools)
-                agent_executor = AgentExecutor(agent=prompt, tools=self.tools)
-                respuesta = agent_executor.invoke({"input": historial[-1]["contenido"]})
-                return respuesta["output"]
+                self.db_manager.registrar_telemetria(
+                    modelo=self.model_name,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    costo_usd=costo_usd,
+                    operacion="chat_completion",
+                    duracion=duration,
+                    exito=success
+                )
             except Exception:
-                pass
-        respuesta = self.llm.invoke(messages)
-        return respuesta.content if hasattr(respuesta, "content") else str(respuesta)
+                pass  # Silent fail - telemetry is non-critical
+        
+        return respuesta
 
     def clasificar_intencion(self, texto_usuario: str) -> str:
         texto_lower = texto_usuario.lower()

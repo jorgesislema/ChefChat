@@ -37,7 +37,7 @@ class ConfigManager:
     PROVIDER_MODELS: Dict[AIProvider, List[str]] = {
         AIProvider.OPENROUTER: ["minimax-2.7b", "openrouter/auto", "gpt-4o", "claude-3-5-sonnet"],
         AIProvider.DEEPSEEK: ["deepseek-chat", "deepseek-coder"],
-        AIProvider.GEMINI: ["gemini-pro", "gemini-1.5-pro", "gemini-2.0-flash"],
+        AIProvider.GEMINI: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
         AIProvider.CLAUDE: ["claude-3-5-sonnet-20240620", "claude-3-opus", "claude-3-haiku"],
         AIProvider.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
         AIProvider.OPENCODE: ["big-pickle", "open-code-v1", "code-assistant"],
