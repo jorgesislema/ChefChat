@@ -1,7 +1,6 @@
 import threading
-import signal
 from typing import Optional, Callable, Dict, Any, List
-from PyQt6.QtCore import QThread, pyqtSignal, pyqtBoundValue, QObject
+from PyQt6.QtCore import QThread, pyqtSignal
 from core.models import AccionOffice
 from agents.orchestrator import Orchestrator
 from core.security import SecurityValidator
@@ -18,11 +17,11 @@ def timeout_handler(signum, frame):
 
 
 class Worker(QThread):
-    chunk_recibido: pyqtBoundValue = pyqtSignal(str)
-    requiere_aprobacion: pyqtBoundValue = pyqtSignal(AccionOffice)
-    accion_completada: pyqtBoundValue = pyqtSignal(str)
-    error_occurred: pyqtBoundValue = pyqtSignal(str)
-    respuesta_completada: pyqtBoundValue = pyqtSignal(str)
+    chunk_recibido = pyqtSignal(str)
+    requiere_aprobacion = pyqtSignal(AccionOffice)
+    accion_completada = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+    respuesta_completada = pyqtSignal(str)
 
     def __init__(
         self,
@@ -31,7 +30,7 @@ class Worker(QThread):
         historial: Optional[List[Dict[str, str]]] = None,
         contexto_rag: Optional[str] = None,
         timeout_segundos: int = 60,
-        parent: Optional[QObject] = None,
+        parent: Optional[object] = None,
     ) -> None:
         super().__init__(parent)
         self.orchestrator: Orchestrator = orchestrator
