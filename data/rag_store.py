@@ -164,11 +164,24 @@ class RAGStore:
                 reader = csv.DictReader(f)
                 
                 for row in reader:
-                    id_receta = row.get('id_receta', '').strip()
-                    nombre = row.get('nombre', '').strip()
-                    
-                    # Calcular comensales basados en ingredientes (default 4 si no existe)
-                    comensales = 4
+                    # Soporte para múltiples nombres de columna
+                    id_receta = (row.get('id_receta') or row.get('ID_Receta') or 
+                                row.get('id') or row.get('ID') or '').strip()
+                    nombre = (row.get('nombre') or row.get('Nombre_Plato') or 
+                             row.get('nombre_plato') or '').strip()
+                    categoria = (row.get('categoria') or row.get('Categoria') or 
+                                row.get('Categoría') or '').strip()
+                    tiempo_prep = (row.get('tiempo_prep') or row.get('Tiempo_Prep_Min') or 
+                                  row.get('tiempo') or '0')
+                    costo = (row.get('costo') or row.get('Costo_Estimado_USD') or 
+                            row.get('costo_estimado') or '0')
+                    ingredientes = (row.get('Ingredientes_Estructurados') or 
+                                   row.get('ingredientes_json') or 
+                                   row.get('ingredientes') or '')
+                    alergenos = (row.get('alergenos') or row.get('Alergenos') or 
+                                row.get('alérgenos') or 'ninguno')
+                    instrucciones = (row.get('instrucciones') or row.get('Instrucciones') or 
+                                    row.get('preparacion') or '')
                     
                     # Verificar si ya existe por id_receta o nombre
                     cursor.execute("""
@@ -192,12 +205,12 @@ class RAGStore:
                         
                         # Comparar si hay diferencias
                         hay_cambios = (
-                            receta_actual[1] != row.get('categoria', '') or
-                            (receta_actual[2] != (int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0)) or
-                            (receta_actual[3] != (float(row.get('costo', 0)) if row.get('costo') else 0.0)) or
-                            receta_actual[4] != row.get('Ingredientes_Estructurados', '') or
-                            receta_actual[5] != row.get('alergenos', '') or
-                            receta_actual[6] != row.get('instrucciones', '')
+                            receta_actual[1] != categoria or
+                            (receta_actual[2] != (int(tiempo_prep) if tiempo_prep else 0)) or
+                            (receta_actual[3] != (float(costo) if costo else 0.0)) or
+                            receta_actual[4] != ingredientes or
+                            receta_actual[5] != alergenos or
+                            receta_actual[6] != instrucciones
                         )
                         
                         if hay_cambios:
@@ -209,12 +222,12 @@ class RAGStore:
                                 WHERE id = ?
                             """, (
                                 doc_id,
-                                row.get('categoria', ''),
-                                int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0,
-                                float(row.get('costo', 0)) if row.get('costo') else 0.0,
-                                row.get('Ingredientes_Estructurados', ''),
-                                row.get('alergenos', ''),
-                                row.get('instrucciones', ''),
+                                categoria,
+                                int(tiempo_prep) if tiempo_prep else 0,
+                                float(costo) if costo else 0.0,
+                                ingredientes,
+                                alergenos,
+                                instrucciones,
                                 existente[0]
                             ))
                             recetas_actualizadas += 1
@@ -232,12 +245,12 @@ class RAGStore:
                             doc_id,
                             id_receta,
                             nombre,
-                            row.get('categoria', ''),
-                            int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0,
-                            float(row.get('costo', 0)) if row.get('costo') else 0.0,
-                            row.get('Ingredientes_Estructurados', ''),
-                            row.get('alergenos', ''),
-                            row.get('instrucciones', '')
+                            categoria,
+                            int(tiempo_prep) if tiempo_prep else 0,
+                            float(costo) if costo else 0.0,
+                            ingredientes,
+                            alergenos,
+                            instrucciones
                         ))
                         recetas_guardadas += 1
                         print(f"  [NEW] Nueva: {nombre}")

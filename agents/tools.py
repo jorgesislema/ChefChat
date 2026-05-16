@@ -126,7 +126,13 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 return f"Receta '{receta_id}' no encontrada"
             
             receta = dict(row)
-            ingredientes = json.loads(receta["ingredientes_json"])
+            ingredientes_raw = receta["ingredientes_json"]
+            
+            # Parsear ingredientes (puede ser JSON o string estructurado)
+            try:
+                ingredientes = json.loads(ingredientes_raw) if isinstance(ingredientes_raw, str) else ingredientes_raw
+            except:
+                ingredientes = []
             
             # Comensales base = 4 por defecto (estándar para recetas)
             comensales_orig = 4
@@ -137,19 +143,17 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                      "", "📝 Ingredientes ajustados:"]
             
             for ing in ingredientes:
-                # Parsear ingredientes estructurados: "cantidad|unidad|nombre"
-                if isinstance(ing, str) and '|' in ing:
+                if isinstance(ing, dict):
+                    cantidad_orig = float(ing.get('cantidad', 0))
+                    cantidad_nueva = round(cantidad_orig * factor, 2)
+                    lineas.append(f"  - {cantidad_nueva} {ing.get('unidad', '')} {ing.get('nombre', '')}")
+                elif isinstance(ing, str) and '|' in ing:
+                    # Formato: "cantidad|unidad|nombre"
                     parts = ing.split('|')
                     if len(parts) >= 3:
                         cantidad_orig = float(parts[0])
-                        unidad = parts[1]
-                        nombre = parts[2]
                         cantidad_nueva = round(cantidad_orig * factor, 2)
-                        lineas.append(f"  - {cantidad_nueva} {unidad} {nombre} (era: {cantidad_orig})")
-                elif isinstance(ing, dict):
-                    cantidad_orig = float(ing.get('cantidad', 0))
-                    cantidad_nueva = round(cantidad_orig * factor, 2)
-                    lineas.append(f"  - {cantidad_nueva} {ing.get('unidad', '')} {ing.get('nombre', '')} (era: {cantidad_orig})")
+                        lineas.append(f"  - {cantidad_nueva} {parts[1]} {parts[2]}")
             
             lineas.append(f"\n💰 Costo estimado: ${receta['costo'] * factor:.2f} (original: ${receta['costo']:.2f})")
             lineas.append(f"⏱️ Tiempo prep: {receta['tiempo_prep']} min (no cambia con escalado)")
