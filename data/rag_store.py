@@ -156,26 +156,91 @@ class RAGStore:
         
         try:
             cursor = conn.cursor()
+            recetas_guardadas = 0
+            recetas_duplicadas = 0
+            recetas_actualizadas = 0
+            
             with open(path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 
                 for row in reader:
+                    id_receta = row.get('id_receta', '')
+                    nombre = row.get('nombre', '')
+                    
+                    # Verificar si ya existe por id_receta o nombre
                     cursor.execute("""
-                        INSERT OR REPLACE INTO RecetasRAG 
-                        (documento_id, id_receta, nombre, categoria, tiempo_prep, 
-                         costo, ingredientes_json, alergenos, instrucciones)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        doc_id,
-                        row.get('id_receta', ''),
-                        row.get('nombre', ''),
-                        row.get('categoria', ''),
-                        int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0,
-                        float(row.get('costo', 0)) if row.get('costo') else 0.0,
-                        row.get('Ingredientes_Estructurados', ''),
-                        row.get('alergenos', ''),
-                        row.get('instrucciones', '')
-                    ))
+                        SELECT id, nombre FROM RecetasRAG 
+                        WHERE id_receta = ? OR nombre = ?
+                    """, (id_receta, nombre))
+                    
+                    existente = cursor.fetchone()
+                    
+                    if existente:
+                        recetas_duplicadas += 1
+                        
+                        # Verificar si hay cambios reales
+                        cursor.execute("""
+                            SELECT nombre, categoria, tiempo_prep, costo, 
+                                   ingredientes_json, alergenos, instrucciones
+                            FROM RecetasRAG WHERE id = ?
+                        """, (existente[0],))
+                        
+                        receta_actual = cursor.fetchone()
+                        
+                        # Comparar si hay diferencias
+                        hay_cambios = (
+                            receta_actual[1] != row.get('categoria', '') or
+                            (receta_actual[2] != (int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0)) or
+                            (receta_actual[3] != (float(row.get('costo', 0)) if row.get('costo') else 0.0)) or
+                            receta_actual[4] != row.get('Ingredientes_Estructurados', '') or
+                            receta_actual[5] != row.get('alergenos', '') or
+                            receta_actual[6] != row.get('instrucciones', '')
+                        )
+                        
+                        if hay_cambios:
+                                cursor.execute("""
+                                    UPDATE RecetasRAG 
+                                    SET documento_id = ?, categoria = ?, tiempo_prep = ?, 
+                                        costo = ?, ingredientes_json = ?, alergenos = ?, 
+                                        instrucciones = ?
+                                    WHERE id = ?
+                                """, (
+                                    doc_id,
+                                    row.get('categoria', ''),
+                                    int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0,
+                                    float(row.get('costo', 0)) if row.get('costo') else 0.0,
+                                    row.get('Ingredientes_Estructurados', ''),
+                                    row.get('alergenos', ''),
+                                    row.get('instrucciones', ''),
+                                    existente[0]
+                                ))
+                                recetas_actualizadas += 1
+                                print(f"  [ACT] Actualizada: {nombre}")
+                        else:
+                            print(f"  [DUP] Duplicada (sin cambios): {nombre}")
+                    else:
+                        # Insertar nueva
+                        cursor.execute("""
+                            INSERT INTO RecetasRAG 
+                            (documento_id, id_receta, nombre, categoria, tiempo_prep, 
+                             costo, ingredientes_json, alergenos, instrucciones)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            doc_id,
+                            id_receta,
+                            nombre,
+                            row.get('categoria', ''),
+                            int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0,
+                            float(row.get('costo', 0)) if row.get('costo') else 0.0,
+                            row.get('Ingredientes_Estructurados', ''),
+                            row.get('alergenos', ''),
+                            row.get('instrucciones', '')
+                        ))
+                        recetas_guardadas += 1
+                        print(f"  [NEW] Nueva: {nombre}")
+            
+            print(f"\n  Resumen: {recetas_guardadas} nuevas, {recetas_actualizadas} actualizadas, {recetas_duplicadas} duplicadas")
+            
         except Exception as e:
             print(f"Error guardando recetas: {e}")
 
@@ -219,7 +284,7 @@ class RAGStore:
 
     def guardar_lotes_inventario(self, metadata: Dict[str, Any], db_manager) -> int:
         """
-        Guarda lotes de inventario desde CSV.
+        Guarda lotes de inventario evitando duplicados.
         
         Args:
             metadata: Metadata del documento.
@@ -232,28 +297,63 @@ class RAGStore:
         path = metadata["path"]
         
         try:
+            lotes_guardados = 0
+            lotes_duplicados = 0
+            lotes_actualizados = 0
+            
             with open(path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 
                 for row in reader:
-                    producto_id = row.get('producto_id', '')
+                    id_lote = row.get('id_lote', '').strip()
+                    producto_id = row.get('producto_id', '').strip()
+                    fecha_ingreso = row.get('fecha_ingreso', datetime.now().strftime('%Y-%m-%d'))
+                    cantidad = float(row.get('cantidad_actual', 0))
+                    unidad = row.get('unidad', 'unidad')
                     fecha_caducidad = row.get('fecha_caducidad_fija', None)
                     if fecha_caducidad == '':
                         fecha_caducidad = None
                     
                     with db_manager._get_connection() as conn:
                         cursor = conn.cursor()
+                        
+                        # Verificar duplicado por id_lote
                         cursor.execute("""
-                            INSERT INTO Inventario 
-                            (producto_id, fecha_ingreso, cantidad_actual, unidad, fecha_caducidad_fija)
-                            VALUES (?, ?, ?, ?, ?)
-                        """, (
-                            producto_id,
-                            row.get('fecha_ingreso', datetime.now().strftime('%Y-%m-%d')),
-                            float(row.get('cantidad_actual', 0)),
-                            row.get('unidad', 'unidad'),
-                            fecha_caducidad
-                        ))
+                            SELECT id, cantidad_actual, fecha_caducidad_fija 
+                            FROM Inventario WHERE id_lote = ?
+                        """, (id_lote,))
+                        
+                        existente = cursor.fetchone()
+                        
+                        # Si no tiene id_lote, buscar por producto_id + fecha_ingreso
+                        if existente is None and not id_lote:
+                            cursor.execute("""
+                                SELECT id, cantidad_actual FROM Inventario 
+                                WHERE producto_id = ? AND fecha_ingreso = ?
+                            """, (producto_id, fecha_ingreso))
+                            existente = cursor.fetchone()
+                        
+                        if existente:
+                            lotes_duplicados += 1
+                            
+                            # Actualizar cantidad si hay cambios
+                            cursor.execute("""
+                                UPDATE Inventario 
+                                SET cantidad_actual = ?, fecha_caducidad_fija = ?
+                                WHERE id = ?
+                            """, (cantidad, fecha_caducidad, existente[0]))
+                            lotes_actualizados += 1
+                            print(f"  [ACT] Actualizado: {id_lote or producto_id}")
+                        else:
+                            cursor.execute("""
+                                INSERT INTO Inventario 
+                                (producto_id, fecha_ingreso, cantidad_actual, unidad, fecha_caducidad_fija)
+                                VALUES (?, ?, ?, ?, ?)
+                            """, (producto_id, fecha_ingreso, cantidad, unidad, fecha_caducidad))
+                            lotes_guardados += 1
+                            print(f"  [NEW] Nuevo: {id_lote or producto_id}")
+            
+            print(f"\n  Resumen: {lotes_guardados} nuevos, {lotes_actualizados} actualizados, {lotes_duplicados} duplicados")
                     
         except Exception as e:
             print(f"Error guardando lotes: {e}")
@@ -262,7 +362,7 @@ class RAGStore:
 
     def guardar_catalogo(self, metadata: Dict[str, Any], db_manager) -> int:
         """
-        Guarda catálogo de productos.
+        Guarda catálogo de productos evitando duplicados.
         
         Args:
             metadata: Metadata del documento.
@@ -275,15 +375,54 @@ class RAGStore:
         path = metadata["path"]
         
         try:
+            productos_guardados = 0
+            productos_duplicados = 0
+            productos_actualizados = 0
+            
             with open(path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 
                 for row in reader:
-                    db_manager.insertar_catalogo(
-                        nombre=row.get('nombre', ''),
-                        categoria=row.get('categoria', ''),
-                        vida_util_dias=int(row.get('vida_util_dias', 30))
-                    )
+                    nombre = row.get('nombre', '').strip().title()
+                    categoria = row.get('categoria', '').strip().title()
+                    vida_util = int(row.get('vida_util_dias', 30))
+                    
+                    # Verificar duplicado por nombre
+                    with db_manager._get_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            SELECT id, vida_util_dias, categoria 
+                            FROM Catalogo WHERE nombre = ?
+                        """, (nombre,))
+                        
+                        existente = cursor.fetchone()
+                        
+                        if existente:
+                            productos_duplicados += 1
+                            
+                            # Verificar si hay cambios
+                            hay_cambios = (
+                                existente[1] != vida_util or
+                                existente[2] != categoria
+                            )
+                            
+                            if hay_cambios:
+                                cursor.execute("""
+                                    UPDATE Catalogo 
+                                    SET vida_util_dias = ?, categoria = ?
+                                    WHERE id = ?
+                                """, (vida_util, categoria, existente[0]))
+                                productos_actualizados += 1
+                                print(f"  [ACT] Actualizado: {nombre}")
+                            else:
+                                print(f"  [DUP] Duplicado (sin cambios): {nombre}")
+                        else:
+                            db_manager.insertar_catalogo(nombre, categoria, vida_util)
+                            productos_guardados += 1
+                            print(f"  [NEW] Nuevo: {nombre}")
+            
+            print(f"\n  Resumen: {productos_guardados} nuevos, {productos_actualizados} actualizados, {productos_duplicados} duplicados")
+            
         except Exception as e:
             print(f"Error guardando catálogo: {e}")
         

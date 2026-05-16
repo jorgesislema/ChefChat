@@ -78,34 +78,6 @@ class DatabaseManager:
             """)
             
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS Inventario (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    producto_id INTEGER NOT NULL,
-                    fecha_ingreso DATE NOT NULL,
-                    cantidad REAL NOT NULL CHECK(cantidad > 0),
-                    unidad TEXT NOT NULL,
-                    FOREIGN KEY (producto_id) REFERENCES Catalogo(id)
-                )
-            """)
-            
-            cursor.execute("""
-                CREATE VIEW IF NOT EXISTS Vista_Caducidad AS
-                SELECT 
-                    i.id as inventario_id,
-                    c.nombre as producto_nombre,
-                    c.categoria,
-                    i.fecha_ingreso,
-                    i.cantidad,
-                    i.unidad,
-                    c.vida_util_dias,
-                    date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days') as fecha_caducidad_efectiva,
-                    CAST(julianday(date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) - julianday(date('now')) AS INTEGER) as dias_restantes
-                FROM Inventario i
-                JOIN Catalogo c ON i.producto_id = c.id
-                WHERE i.cantidad > 0
-            """)
-            
-            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Bitacora_Diaria (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -165,9 +137,11 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS Inventario (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     producto_id INTEGER NOT NULL,
+                    id_lote TEXT,
                     fecha_ingreso DATE NOT NULL,
-                    cantidad REAL NOT NULL CHECK(cantidad > 0),
+                    cantidad_actual REAL NOT NULL CHECK(cantidad_actual > 0),
                     unidad TEXT NOT NULL,
+                    fecha_caducidad_fija DATE,
                     FOREIGN KEY (producto_id) REFERENCES Catalogo(id)
                 )
             """)
@@ -179,15 +153,29 @@ class DatabaseManager:
                     c.nombre as producto_nombre,
                     c.categoria,
                     i.fecha_ingreso,
-                    i.cantidad,
+                    i.cantidad_actual,
                     i.unidad,
                     c.vida_util_dias,
                     date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days') as fecha_caducidad_efectiva,
                     CAST(julianday(date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) - julianday(date('now')) AS INTEGER) as dias_restantes
                 FROM Inventario i
                 JOIN Catalogo c ON i.producto_id = c.id
-                WHERE i.cantidad > 0
+                WHERE i.cantidad_actual > 0
             """)
+            
+            # Índices para Inventario (después de crear la tabla y vista)
+            try:
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_inventario_lote 
+                    ON Inventario(id_lote)
+                """)
+                
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_inventario_producto_fecha 
+                    ON Inventario(producto_id, fecha_ingreso)
+                """)
+            except Exception as e:
+                print(f"Nota: {e}")
             
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Bitacora_Diaria (
@@ -227,7 +215,7 @@ class DatabaseManager:
         Args:
             nombre: Nombre del producto.
             categoria: Categoría (Fresco, Congelado, Seco, etc.).
-            vida_util_dias: Días de vida útil.
+            vida_util_dias: Días de vida útil (máx 365, se ajusta automáticamente).
             
         Returns:
             int: ID del producto insertado.
@@ -235,6 +223,12 @@ class DatabaseManager:
         Example:
             db.insertar_catalogo("Fresa", "Fresco", 8)
         """
+        # Ajustar vida útil a máximo 365 días
+        if vida_util_dias > 365:
+            vida_util_dias = 365
+        elif vida_util_dias <= 0:
+            vida_util_dias = 30
+            
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
