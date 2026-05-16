@@ -164,8 +164,11 @@ class RAGStore:
                 reader = csv.DictReader(f)
                 
                 for row in reader:
-                    id_receta = row.get('id_receta', '')
-                    nombre = row.get('nombre', '')
+                    id_receta = row.get('id_receta', '').strip()
+                    nombre = row.get('nombre', '').strip()
+                    
+                    # Calcular comensales basados en ingredientes (default 4 si no existe)
+                    comensales = 4
                     
                     # Verificar si ya existe por id_receta o nombre
                     cursor.execute("""
@@ -198,24 +201,24 @@ class RAGStore:
                         )
                         
                         if hay_cambios:
-                                cursor.execute("""
-                                    UPDATE RecetasRAG 
-                                    SET documento_id = ?, categoria = ?, tiempo_prep = ?, 
-                                        costo = ?, ingredientes_json = ?, alergenos = ?, 
-                                        instrucciones = ?
-                                    WHERE id = ?
-                                """, (
-                                    doc_id,
-                                    row.get('categoria', ''),
-                                    int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0,
-                                    float(row.get('costo', 0)) if row.get('costo') else 0.0,
-                                    row.get('Ingredientes_Estructurados', ''),
-                                    row.get('alergenos', ''),
-                                    row.get('instrucciones', ''),
-                                    existente[0]
-                                ))
-                                recetas_actualizadas += 1
-                                print(f"  [ACT] Actualizada: {nombre}")
+                            cursor.execute("""
+                                UPDATE RecetasRAG 
+                                SET documento_id = ?, categoria = ?, tiempo_prep = ?, 
+                                    costo = ?, ingredientes_json = ?, alergenos = ?, 
+                                    instrucciones = ?
+                                WHERE id = ?
+                            """, (
+                                doc_id,
+                                row.get('categoria', ''),
+                                int(row.get('tiempo_prep', 0)) if row.get('tiempo_prep') else 0,
+                                float(row.get('costo', 0)) if row.get('costo') else 0.0,
+                                row.get('Ingredientes_Estructurados', ''),
+                                row.get('alergenos', ''),
+                                row.get('instrucciones', ''),
+                                existente[0]
+                            ))
+                            recetas_actualizadas += 1
+                            print(f"  [ACT] Actualizada: {nombre}")
                         else:
                             print(f"  [DUP] Duplicada (sin cambios): {nombre}")
                     else:
