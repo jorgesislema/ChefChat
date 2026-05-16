@@ -656,7 +656,8 @@ class MainWindow(QMainWindow):
                 orchestrator=orchestrator,
                 message=message,
                 historial=historial,
-                contexto_rag=None
+                contexto_rag=None,
+                timeout_segundos=90  # 90 segundos timeout
             )
             self.worker.chunk_recibido.connect(self._on_chunk_received)
             self.worker.error_occurred.connect(self._on_error)
