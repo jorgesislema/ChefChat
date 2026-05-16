@@ -321,28 +321,58 @@ class RAGStore:
                 reader = csv.DictReader(f)
                 
                 for row in reader:
-                    id_lote = row.get('id_lote', '').strip()
-                    producto_id = row.get('producto_id', '').strip()
-                    fecha_ingreso = row.get('fecha_ingreso', datetime.now().strftime('%Y-%m-%d'))
-                    cantidad = float(row.get('cantidad_actual', 0))
-                    unidad = row.get('unidad', 'unidad')
-                    fecha_caducidad = row.get('fecha_caducidad_fija', None)
+                    # Soporte para múltiples nombres de columna
+                    id_lote = (row.get('id_lote') or row.get('ID_Lote') or 
+                              row.get('lote') or '').strip()
+                    
+                    # Buscar producto_id o ID_Producto
+                    producto_id = (row.get('producto_id') or row.get('ID_Producto') or 
+                                  row.get('id_producto') or '').strip()
+                    
+                    # Si no hay producto_id pero hay Nombre, buscar en Catálogo
+                    if not producto_id and (row.get('nombre') or row.get('Nombre')):
+                        nombre_producto = (row.get('nombre') or row.get('Nombre')).strip().title()
+                        with db_manager._get_connection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT id FROM Catalogo WHERE nombre = ?", (nombre_producto,))
+                            prod_row = cursor.fetchone()
+                            if prod_row:
+                                producto_id = str(prod_row[0])
+                    
+                    fecha_ingreso = (row.get('fecha_ingreso') or row.get('Fecha_Ingreso') or 
+                                    row.get('fecha') or datetime.now().strftime('%Y-%m-%d'))
+                    
+                    # Cantidad puede estar en varias columnas
+                    cantidad_str = (row.get('cantidad_actual') or row.get('Cantidad_Actual') or 
+                                   row.get('cantidad') or row.get('Cantidad') or 
+                                   row.get('stock') or '0')
+                    try:
+                        cantidad = float(cantidad_str)
+                        if cantidad <= 0:
+                            cantidad = 1
+                    except:
+                        cantidad = 1
+                    
+                    unidad = (row.get('unidad') or row.get('Unidad') or 
+                             row.get('unidad_medida') or 'unidad').strip().lower()
+                    
+                    fecha_caducidad = (row.get('fecha_caducidad_fija') or row.get('Fecha_Caducidad_Fija') or 
+                                      row.get('fecha_caducidad') or row.get('caducidad') or None)
                     if fecha_caducidad == '':
                         fecha_caducidad = None
                     
                     with db_manager._get_connection() as conn:
                         cursor = conn.cursor()
                         
-                        # Verificar duplicado por id_lote
-                        cursor.execute("""
-                            SELECT id, cantidad_actual, fecha_caducidad_fija 
-                            FROM Inventario WHERE id_lote = ?
-                        """, (id_lote,))
-                        
-                        existente = cursor.fetchone()
-                        
-                        # Si no tiene id_lote, buscar por producto_id + fecha_ingreso
-                        if existente is None and not id_lote:
+                        # Verificar duplicado por id_lote si existe
+                        if id_lote:
+                            cursor.execute("""
+                                SELECT id, cantidad_actual, fecha_caducidad_fija 
+                                FROM Inventario WHERE id_lote = ?
+                            """, (id_lote,))
+                            existente = cursor.fetchone()
+                        else:
+                            # Si no hay id_lote, buscar por producto_id + fecha_ingreso
                             cursor.execute("""
                                 SELECT id, cantidad_actual FROM Inventario 
                                 WHERE producto_id = ? AND fecha_ingreso = ?
@@ -352,20 +382,20 @@ class RAGStore:
                         if existente:
                             lotes_duplicados += 1
                             
-                            # Actualizar cantidad si hay cambios
+                            # Actualizar cantidad
                             cursor.execute("""
                                 UPDATE Inventario 
-                                SET cantidad_actual = ?, fecha_caducidad_fija = ?
+                                SET cantidad_actual = ?, fecha_caducidad_fija = ?, unidad = ?
                                 WHERE id = ?
-                            """, (cantidad, fecha_caducidad, existente[0]))
+                            """, (cantidad, fecha_caducidad, unidad, existente[0]))
                             lotes_actualizados += 1
                             print(f"  [ACT] Actualizado: {id_lote or producto_id}")
                         else:
                             cursor.execute("""
                                 INSERT INTO Inventario 
-                                (producto_id, fecha_ingreso, cantidad_actual, unidad, fecha_caducidad_fija)
-                                VALUES (?, ?, ?, ?, ?)
-                            """, (producto_id, fecha_ingreso, cantidad, unidad, fecha_caducidad))
+                                (producto_id, id_lote, fecha_ingreso, cantidad_actual, unidad, fecha_caducidad_fija)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (producto_id, id_lote if id_lote else None, fecha_ingreso, cantidad, unidad, fecha_caducidad))
                             lotes_guardados += 1
                             print(f"  [NEW] Nuevo: {id_lote or producto_id}")
             
@@ -399,9 +429,27 @@ class RAGStore:
                 reader = csv.DictReader(f)
                 
                 for row in reader:
-                    nombre = row.get('nombre', '').strip().title()
-                    categoria = row.get('categoria', '').strip().title()
-                    vida_util = int(row.get('vida_util_dias', 30))
+                    # Soporte para múltiples nombres de columna
+                    id_producto = (row.get('id_producto') or row.get('ID_Producto') or 
+                                  row.get('id') or '').strip()
+                    nombre = (row.get('nombre') or row.get('Nombre') or 
+                             row.get('nombre_producto') or '').strip().title()
+                    categoria = (row.get('categoria') or row.get('Categoria') or 
+                                row.get('Categoría') or '').strip().title()
+                    tipo_caducidad = (row.get('tipo_caducidad') or row.get('Tipo_Caducidad') or 
+                                     row.get('tipo') or 'Dinamica').strip().title()
+                    vida_util = (row.get('vida_util_dias') or row.get('Vida_Util_Dias') or 
+                                row.get('vida_util') or '30')
+                    
+                    # Ajustar vida útil a máximo 365 días
+                    try:
+                        vida_util_dias = int(vida_util)
+                        if vida_util_dias > 365:
+                            vida_util_dias = 365
+                        elif vida_util_dias <= 0:
+                            vida_util_dias = 30
+                    except:
+                        vida_util_dias = 30
                     
                     # Verificar duplicado por nombre
                     with db_manager._get_connection() as conn:
@@ -418,7 +466,7 @@ class RAGStore:
                             
                             # Verificar si hay cambios
                             hay_cambios = (
-                                existente[1] != vida_util or
+                                existente[1] != vida_util_dias or
                                 existente[2] != categoria
                             )
                             
@@ -427,13 +475,13 @@ class RAGStore:
                                     UPDATE Catalogo 
                                     SET vida_util_dias = ?, categoria = ?
                                     WHERE id = ?
-                                """, (vida_util, categoria, existente[0]))
+                                """, (vida_util_dias, categoria, existente[0]))
                                 productos_actualizados += 1
                                 print(f"  [ACT] Actualizado: {nombre}")
                             else:
                                 print(f"  [DUP] Duplicado (sin cambios): {nombre}")
                         else:
-                            db_manager.insertar_catalogo(nombre, categoria, vida_util)
+                            db_manager.insertar_catalogo(nombre, categoria, vida_util_dias)
                             productos_guardados += 1
                             print(f"  [NEW] Nuevo: {nombre}")
             
