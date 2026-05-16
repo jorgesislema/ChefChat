@@ -32,7 +32,9 @@ from agents.tools import crear_herramientas_operativas
 from core.config import AIProvider, ConfigManager
 from core.security import SecurityValidator
 from core.rag_classifier import cargar_documentos_rag, generar_resumen_carga
+from gui.telemetry_view import TelemetryDashboard
 from data.db_manager import DatabaseManager
+from data.rag_store import RAGStore
 
 
 DARK_THEME = {
@@ -280,6 +282,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1400, 900)
         
         self.db = DatabaseManager()
+        self.rag_store = RAGStore(db_path="chefchat.db")
         self.theme_mode = "dark"
         self.current_theme = DARK_THEME
         
@@ -355,6 +358,13 @@ class MainWindow(QMainWindow):
         self.btn_keys.setToolTip("Configuración de Bóveda")
         self.btn_keys.clicked.connect(self._show_keys_dialog)
         header_layout.addWidget(self.btn_keys, stretch=1)
+        
+        self.btn_telemetry = QPushButton("📊")
+        self.btn_telemetry.setObjectName("btn_telemetry")
+        self.btn_telemetry.setStyleSheet("max-width: 40px; font-size: 12pt;")
+        self.btn_telemetry.setToolTip("Ver Telemetría")
+        self.btn_telemetry.clicked.connect(self._toggle_telemetry)
+        header_layout.addWidget(self.btn_telemetry, stretch=1)
         
         left_layout.addWidget(header)
         
@@ -448,6 +458,10 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.hitl_bar, stretch=1)
         splitter.addWidget(right_widget)
         self._right_panel = right_widget
+        
+        # Telemetry Dashboard (hidden by default)
+        self.telemetry_dashboard: Optional[TelemetryDashboard] = None
+        self._telemetry_visible = False
 
     def _toggle_theme(self) -> None:
         """Alterna entre tema Claro y Oscuro."""
@@ -524,10 +538,52 @@ class MainWindow(QMainWindow):
             self._update_provider_selector()
             QMessageBox.information(self, "Guardado", "API Key guardada en el sistema seguro")
 
+    def _toggle_telemetry(self) -> None:
+        """Muestra/oculta el dashboard de telemetría."""
+        if self._telemetry_visible:
+            self.stacked_widget.setCurrentIndex(0)
+            self._telemetry_visible = False
+        else:
+            if not self.telemetry_dashboard:
+                self.telemetry_dashboard = TelemetryDashboard(self.db, self)
+                self.stacked_widget.addWidget(self.telemetry_dashboard)
+            self.stacked_widget.setCurrentIndex(2)
+            self._telemetry_visible = True
+
+    def _generar_resumen_guardado(self, resultados: Dict[str, Any]) -> str:
+        """
+        Genera mensaje de resumen después de guardar documentos.
+        
+        Args:
+            resultados: Dict de rag_store.guardar_documentos().
+            
+        Returns:
+            str: Mensaje formateado para el usuario.
+        """
+        lineas = [f"✅ Documentos guardados: {resultados['guardados']}/{resultados['total']}"]
+        
+        if resultados["recetas"] > 0:
+            lineas.append(f"  📖 Recetas: {resultados['recetas']}")
+        if resultados["catalogo"] > 0:
+            lineas.append(f"  📦 Catálogo: {resultados['catalogo']}")
+        if resultados["lotes"] > 0:
+            lineas.append(f"  📋 Lotes: {resultados['lotes']}")
+        if resultados["manuales"] > 0:
+            lineas.append(f"  📘 Manuales BPM: {resultados['manuales']}")
+        if resultados["genericos"] > 0:
+            lineas.append(f"  📄 Genéricos: {resultados['genericos']}")
+        
+        if resultados["errores"]:
+            lineas.append(f"\n⚠️ Errores: {len(resultados['errores'])}")
+            for error in resultados["errores"][:3]:
+                lineas.append(f"  - {error}")
+        
+        return "\n".join(lineas)
+
     @pyqtSlot()
     def _on_rag_ingest(self) -> None:
         """
-        Abre diálogo para seleccionar documentos y los clasifica automáticamente.
+        Abre diálogo para seleccionar documentos, los clasifica y guarda en BD.
         
         Tipos detectados:
         - Recetas (CSV con columna Ingredientes)
@@ -541,32 +597,24 @@ class MainWindow(QMainWindow):
             "Documentos (*.csv *.md *.txt);;Todos los archivos (*.*)"
         )
         if file_paths:
-            # Clasificar automáticamente
-            resultados = cargar_documentos_rag(file_paths)
+            self._append_system_message("⏳ Procesando documentos...")
+            
+            # Guardar documentos en base de datos
+            resultados = self.rag_store.guardar_documentos(file_paths, self.db)
             self._rag_files.extend(file_paths)
             
             # Mostrar resumen detallado
-            resumen = generar_resumen_carga(resultados)
+            resumen = self._generar_resumen_guardado(resultados)
             self._append_system_message(resumen)
             
             # Mostrar en visor derecho
             self.viewer_read.clear()
-            self.viewer_read.append("<h3>📚 Documentos Cargados</h3>")
+            self.viewer_read.append("<h3>📚 Documentos Guardados</h3>")
             
-            for doc in resultados["documentos"]:
-                icono = {"receta": "📖", "catalogo_inventario": "📦", 
-                        "lotes_inventario": "📋", "manual_bpm": "📘", 
-                        "generico": "📄"}.get(doc["tipo"], "📄")
-                
-                self.viewer_read.append(
-                    f"<b>{icono} {doc['nombre']}</b><br>"
-                    f"Tipo: {doc['tipo']}<br>"
-                    f"Columnas: {', '.join(doc.get('columnas', [])[:5])}<br>"
-                    f"Filas: {doc.get('filas', 'N/A')}<br>"
-                    f"Tamaño: {doc.get('tamano_bytes', 0)} bytes<br>"
-                    f"{'─' * 40}<br>"
-                )
+            for doc in resultados.get("documentos_ids", []):
+                self.viewer_read.append(f"✅ Documento ID: {doc}")
             
+            self.viewer_read.append(f"\n<b>Total guardados: {resultados['guardados']}</b>")
             self.viewer_read.moveCursor(QTextCursor.MoveOperation.End)
 
     @pyqtSlot()
@@ -591,8 +639,11 @@ class MainWindow(QMainWindow):
         
         try:
             self._append_system_message(f"⏳ Procesando con {provider.value}...")
-            orchestrator = Orchestrator(provider=provider, model=self._selected_model)
-            
+            orchestrator = Orchestrator(
+                provider=provider,
+                model=self._selected_model,
+                db_manager=self.db  # For telemetry
+            )
             tools = crear_herramientas_operativas(self.db)
             orchestrator.tools = tools
             

@@ -64,17 +64,7 @@ class DatabaseManager:
             conn.close()
 
     def _init_db(self) -> None:
-        """
-        Inicializa todas las tablas y vistas de la base de datos.
-        
-        Crea las siguientes estructuras:
-        - Catalogo: Productos del restaurante
-        - Inventario: Registro de entradas de productos
-        - Vista_Caducidad: Vista SQL para cálculo de caducidad
-        - Bitacora_Diaria: Registro de incidencias
-        - Ventas_Historicas: Histórico de ventas
-        - Recetas: Recetario del restaurante
-        """
+        """Inicializa todas las tablas y vistas de la base de datos."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             
@@ -85,6 +75,90 @@ class DatabaseManager:
                     categoria TEXT NOT NULL,
                     vida_util_dias INTEGER NOT NULL CHECK(vida_util_dias > 0 AND vida_util_dias <= 365)
                 )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Inventario (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    producto_id INTEGER NOT NULL,
+                    fecha_ingreso DATE NOT NULL,
+                    cantidad REAL NOT NULL CHECK(cantidad > 0),
+                    unidad TEXT NOT NULL,
+                    FOREIGN KEY (producto_id) REFERENCES Catalogo(id)
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE VIEW IF NOT EXISTS Vista_Caducidad AS
+                SELECT 
+                    i.id as inventario_id,
+                    c.nombre as producto_nombre,
+                    c.categoria,
+                    i.fecha_ingreso,
+                    i.cantidad,
+                    i.unidad,
+                    c.vida_util_dias,
+                    date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days') as fecha_caducidad_efectiva,
+                    CAST(julianday(date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) - julianday(date('now')) AS INTEGER) as dias_restantes
+                FROM Inventario i
+                JOIN Catalogo c ON i.producto_id = c.id
+                WHERE i.cantidad > 0
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Bitacora_Diaria (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    categoria TEXT NOT NULL,
+                    descripcion TEXT NOT NULL
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Ventas_Historicas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    receta_id INTEGER NOT NULL,
+                    receta_nombre TEXT NOT NULL,
+                    unidades_vendidas INTEGER NOT NULL CHECK(unidades_vendidas > 0),
+                    precio_venta REAL NOT NULL CHECK(precio_venta > 0),
+                    costo_produccion REAL NOT NULL CHECK(costo_produccion >= 0),
+                    fecha_venta DATE DEFAULT CURRENT_DATE
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Recetas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL UNIQUE,
+                    ingredientes TEXT NOT NULL,
+                    comensales INTEGER NOT NULL CHECK(comensales > 0),
+                    costo_produccion REAL NOT NULL CHECK(costo_produccion >= 0)
+                )
+            """)
+            
+            # Telemetría y Observabilidad
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS telemetria (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    modelo_usado TEXT NOT NULL,
+                    input_tokens INTEGER DEFAULT 0,
+                    output_tokens INTEGER DEFAULT 0,
+                    costo_total_usd REAL DEFAULT 0.0,
+                    tipo_operacion TEXT NOT NULL,
+                    duracion_segundos REAL DEFAULT 0.0,
+                    exito INTEGER DEFAULT 1
+                )
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_telemetria_timestamp 
+                ON telemetria(timestamp DESC)
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_telemetria_modelo 
+                ON telemetria(modelo_usado)
             """)
             
             cursor.execute("""
@@ -168,6 +242,21 @@ class DatabaseManager:
                 (nombre.strip().title(), categoria.strip().title(), vida_util_dias)
             )
             return cursor.lastrowid
+
+    def crear_producto(self, nombre: str, categoria: str, tipo_caducidad: str, vida_util_dias: int) -> int:
+        """
+        Crea un producto en el catálogo con tipo de caducidad.
+        
+        Args:
+            nombre: Nombre del producto.
+            categoria: Categoría del producto.
+            tipo_caducidad: 'Fija' o 'Dinamica'.
+            vida_util_dias: Días de vida útil.
+            
+        Returns:
+            int: ID del producto creado.
+        """
+        return self.insertar_catalogo(nombre, categoria, vida_util_dias)
 
     def insertar_inventario(
         self, producto_id: int, cantidad: float, unidad: str, 
@@ -504,3 +593,113 @@ class DatabaseManager:
             )
             rows = cursor.fetchall()
             return [BitacoraDiaria(**dict(row)) for row in rows]
+
+    # =========================================================================
+    # TELEMETRÍA Y OBSERVABILIDAD
+    # =========================================================================
+
+    def registrar_telemetria(
+        self, modelo: str, input_tokens: int, output_tokens: int,
+        costo_usd: float, operacion: str, duracion: float = 0.0, exito: bool = True
+    ) -> int:
+        """Registra una llamada al LLM en la tabla de telemetría."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO telemetria 
+                (modelo_usado, input_tokens, output_tokens, costo_total_usd, 
+                 tipo_operacion, duracion_segundos, exito)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (modelo, input_tokens, output_tokens, costo_usd, 
+                  operacion, duracion, 1 if exito else 0))
+            return cursor.lastrowid
+
+    def obtener_gasto_total_mes(self) -> float:
+        """Obtiene el gasto total del mes actual en USD."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COALESCE(SUM(costo_total_usd), 0.0) as total
+                FROM telemetria
+                WHERE strftime('%Y-%m', timestamp) = strftime('%Y-%m', 'now')
+            """)
+            row = cursor.fetchone()
+            return float(row["total"]) if row else 0.0
+
+    def obtener_total_tokens(self) -> Dict[str, int]:
+        """Obtiene el total de tokens consumidos (input/output)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    COALESCE(SUM(input_tokens), 0) as input_total,
+                    COALESCE(SUM(output_tokens), 0) as output_total
+                FROM telemetria
+                WHERE strftime('%Y-%m', timestamp) = strftime('%Y-%m', 'now')
+            """)
+            row = cursor.fetchone()
+            return {
+                "input": int(row["input_total"]) if row else 0,
+                "output": int(row["output_total"]) if row else 0,
+                "total": int(row["input_total"] + row["output_total"]) if row else 0
+            }
+
+    def obtener_total_peticiones(self) -> int:
+        """Obtiene el total de peticiones (llamadas API) del mes."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) as total FROM telemetria
+                WHERE strftime('%Y-%m', timestamp) = strftime('%Y-%m', 'now')
+            """)
+            row = cursor.fetchone()
+            return int(row["total"]) if row else 0
+
+    def obtener_gasto_ultimos_7_dias(self) -> List[Dict[str, Any]]:
+        """Obtiene el gasto diario de los últimos 7 días."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    date(timestamp) as fecha,
+                    SUM(costo_total_usd) as gasto_dia
+                FROM telemetria
+                WHERE date(timestamp) >= date('now', '-6 days')
+                GROUP BY date(timestamp)
+                ORDER BY fecha ASC
+            """)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def obtener_telemetria_reciente(self, limite: int = 50) -> List[Dict[str, Any]]:
+        """Obtiene los registros recientes de telemetría."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    timestamp, modelo_usado, input_tokens, output_tokens,
+                    costo_total_usd, tipo_operacion, exito
+                FROM telemetria
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """, (limite,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def obtener_gasto_por_modelo(self) -> List[Dict[str, Any]]:
+        """Obtiene el gasto acumulado por modelo."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    modelo_usado,
+                    SUM(costo_total_usd) as gasto_total,
+                    COUNT(*) as cantidad_usos,
+                    SUM(input_tokens + output_tokens) as tokens_totales
+                FROM telemetria
+                WHERE strftime('%Y-%m', timestamp) = strftime('%Y-%m', 'now')
+                GROUP BY modelo_usado
+                ORDER BY gasto_total DESC
+            """)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
