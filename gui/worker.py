@@ -1,19 +1,19 @@
 import threading
-from typing import Optional, Callable, Dict, Any, List
-from PyQt6.QtCore import QThread, pyqtSignal
+from typing import Optional, Dict, Any, List
+# pylint: disable=no-name-in-module
+from PyQt6.QtCore import QThread, QObject, pyqtSignal
 from core.models import AccionOffice
 from agents.orchestrator import Orchestrator
 from core.security import SecurityValidator
 
 
-class TimeoutError(Exception):
+class OperationTimeoutError(Exception):
     """Excepción para timeout de operaciones."""
-    pass
 
 
 def timeout_handler(signum, frame):
     """Manejador de señal para timeout."""
-    raise TimeoutError("La operación tardó demasiado tiempo")
+    raise OperationTimeoutError("La operación tardó demasiado tiempo")
 
 
 class Worker(QThread):
@@ -30,7 +30,7 @@ class Worker(QThread):
         historial: Optional[List[Dict[str, str]]] = None,
         contexto_rag: Optional[str] = None,
         timeout_segundos: int = 60,
-        parent: Optional[object] = None,
+        parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
         self.orchestrator: Orchestrator = orchestrator
@@ -72,7 +72,7 @@ class Worker(QThread):
         except TimeoutError as e:
             error_msg = f"⏱️ {str(e)}"
             self.error_occurred.emit(error_msg)
-        except Exception as e:
+        except (ImportError, RuntimeError, ValueError, ConnectionError) as e:
             error_str = str(e)
             
             # Manejar errores específicos de proveedores
@@ -140,8 +140,11 @@ class Worker(QThread):
                 f"Acción MCP completada: {resultado}"
             )
             self.accion_completada.emit(log_msg)
-        except Exception as e:
+        except (ImportError, AttributeError, TypeError, ValueError) as e:
             error_msg = f"Error en acción MCP: {str(e)}"
+            self.error_occurred.emit(error_msg)
+        except OSError as e:
+            error_msg = f"Error del sistema en acción MCP: {str(e)}"
             self.error_occurred.emit(error_msg)
         finally:
             self.pause_condition.set()

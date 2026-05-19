@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "updated_at": "2026-05-18T11:40:38.181223",
+  "test_cases": [
+    {
+      "id": "72f198741199",
+      "name": "Buscar receta pato",
+      "input_message": "busca la receta de pato horneado",
+      "expected_output": "Receta: Pato Horneado",
+      "expected_tool_calls": [],
+      "category": "receta",
+      "tags": [
+        "buscar",
+        "receta"
+      ],
+      "created_at": "2026-05-18T11:40:38.159929",
+      "last_run": "2026-05-18T11:40:38.181194",
+      "passed": false
+    },
+    {
+      "id": "a920e15e94b2",
+      "name": "Lista compras",
+      "input_message": "genera lista de compras para SOP-021",
+      "expected_output": "LISTA DE COMPRAS",
+      "expected_tool_calls": [],
+      "category": "inventario",
+      "tags": [
+        "compras"
+      ],
+      "created_at": "2026-05-18T11:40:38.178828",
+      "last_run": "2026-05-18T11:40:38.181209",
+      "passed": false
+    },
+    {
+      "id": "e74e5dccd879",
+      "name": "Reporte mermas",
+      "input_message": "muestrame el reporte de mermas de los ultimos 7 dias",
+      "expected_output": "REPORTE DE MERMAS",
+      "expected_tool_calls": [],
+      "category": "reporte",
+      "tags": [
+        "mermas",
+        "reporte"
+      ],
+      "created_at": "2026-05-18T11:40:38.180041",
+      "last_run": "2026-05-18T11:40:38.181217",
+      "passed": false
+    }
+  ]
+}

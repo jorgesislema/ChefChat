@@ -2,14 +2,17 @@ import pytest
 import tempfile
 import os
 from typing import Generator
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+# pylint: disable=no-name-in-module, redefined-outer-name
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QCoreApplication
 from core.models import Receta, Evento, AccionOffice, Ingrediente
 from data.db_manager import DatabaseManager
 
 
 @pytest.fixture(scope="session")
-def qapp() -> Generator[QApplication, None, None]:
+def qapp() -> Generator[QApplication | QCoreApplication, None, None]:
+    """Create a QApplication instance for the test session."""
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
@@ -18,7 +21,7 @@ def qapp() -> Generator[QApplication, None, None]:
 
 
 @pytest.fixture
-def temp_db() -> Generator[str, None, None]:
+def tmp_db_path() -> Generator[str, None, None]:
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
     yield db_path
@@ -27,8 +30,12 @@ def temp_db() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def db_manager(temp_db: str) -> DatabaseManager:
-    return DatabaseManager(db_path=temp_db)
+def db_manager(tmp_db_path: str) -> Generator[DatabaseManager, None, None]:
+    """Create a DatabaseManager instance with a temporary database."""
+    yield DatabaseManager(db_path=tmp_db_path)
+
+
+# No changes needed - temp_db is a valid fixture parameter name
 
 
 @pytest.fixture

@@ -1,27 +1,28 @@
 """
-Telemetry Dashboard for ChefChat Pro - Dark Aesthetic UI
+Panel de Telemetría para ChefChat Pro
 
 Observabilidad y Telemetría en Tiempo Real
-- KPI Cards: Gasto Total, Tokens, Peticiones
-- Gráfico de Barras: Gasto últimos 7 días
+- Tarjetas KPI: Gasto Total, Tokens, Peticiones
 - Tabla de Datos: Registros recientes
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Dict
+# pylint: disable=no-name-in-module
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget,
-    QTableWidgetItem, QScrollArea, QFrame, QSizePolicy
+    QTableWidgetItem, QFrame, QSizePolicy, QHeaderView
 )
-from PyQt6.QtCore import Qt, QTimer, QDate
-from PyQt6.QtGui import QColor, QFont, QPainter, QBrush, QPen
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QColor
+
+from data.db_manager import DatabaseManager
 
 
 # =============================================================================
-# PRICING DICTIONARY (USD per 1M tokens)
+# DICCIONARIO DE PRECIOS (USD por 1M tokens)
 # =============================================================================
 
 PRICING = {
-    # OpenRouter Models
     "minimax-2.7b": {"input": 0.14, "output": 0.28},
     "openrouter/auto": {"input": 0.10, "output": 0.20},
     "gpt-4o": {"input": 5.00, "output": 15.00},
@@ -30,360 +31,302 @@ PRICING = {
     "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
     "claude-3-5-sonnet": {"input": 3.00, "output": 15.00},
     "claude-3-opus": {"input": 15.00, "output": 75.00},
-    
-    # DeepSeek
     "deepseek-chat": {"input": 0.14, "output": 0.28},
     "deepseek-coder": {"input": 0.14, "output": 0.28},
-    
-    # Google Gemini
     "gemini-pro": {"input": 0.50, "output": 1.50},
     "gemini-1.5-pro": {"input": 3.50, "output": 10.50},
     "gemini-2.0-flash": {"input": 0.10, "output": 0.30},
-    
-    # Anthropic (Direct)
     "claude-3-5-sonnet-20240620": {"input": 3.00, "output": 15.00},
     "claude-3-haiku": {"input": 0.25, "output": 1.25},
-    
-    # OpenAI (Direct)
-    "gpt-4o": {"input": 5.00, "output": 15.00},
-    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-    
-    # OpenCode
-    "big-pickle": {"input": 0.00, "output": 0.00},  # FREE
-    "open-code-v1": {"input": 0.00, "output": 0.00},  # FREE
-    "code-assistant": {"input": 0.00, "output": 0.00},  # FREE
-    
-    # Default fallback
+    "big-pickle": {"input": 0.00, "output": 0.00},
+    "open-code-v1": {"input": 0.00, "output": 0.00},
+    "code-assistant": {"input": 0.00, "output": 0.00},
     "default": {"input": 1.00, "output": 3.00},
 }
 
 
 def calculate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
-    """
-    Calculates the cost for a given model and token usage.
-    
-    Args:
-        model: Model name identifier.
-        input_tokens: Number of input tokens.
-        output_tokens: Number of output tokens.
-    
-    Returns:
-        float: Cost in USD.
-    """
-    # Find pricing (try exact match, then partial)
-    pricing = PRICING.get(model, PRICING.get("default"))
-    
-    # Calculate cost
-    input_cost = (input_tokens / 1_000_000) * pricing["input"]
-    output_cost = (output_tokens / 1_000_000) * pricing["output"]
-    
+    pricing = PRICING.get(model) or PRICING["default"]
+    input_cost = (input_tokens / 1_000_000.0) * pricing["input"]
+    output_cost = (output_tokens / 1_000_000.0) * pricing["output"]
     return round(input_cost + output_cost, 6)
 
 
 # =============================================================================
-# DARK THEME STYLES
+# TEMAS: colors for dark and light mode
 # =============================================================================
 
-DARK_BG = "#0f172a"
-CARD_BG = "#1e293b"
-TEXT_PRIMARY = "#f5f5f5"
-TEXT_SECONDARY = "#94a3b8"
-ACCENT_GREEN = "#deff9a"
-ACCENT_RED = "#ff4757"
-ACCENT_BLUE = "#3b82f6"
-BORDER_COLOR = "#334155"
+DARK = {
+    "bg": "#0f172a",
+    "card": "#1e293b",
+    "card_alt": "#1a2744",
+    "text": "#f5f5f5",
+    "text_sec": "#94a3b8",
+    "accent": "#3B82F6",
+    "accent_green": "#deff9a",
+    "border": "#334155",
+}
+
+LIGHT = {
+    "bg": "#F1F5F9",
+    "card": "#FFFFFF",
+    "card_alt": "#F1F5F9",
+    "text": "#0F172A",
+    "text_sec": "#475569",
+    "accent": "#2563EB",
+    "accent_green": "#16A34A",
+    "border": "#CBD5E1",
+}
 
 
 class KPICard(QFrame):
-    """KPI Card with rounded corners and accent number."""
-
     def __init__(self, title: str, value: str, icon: str = "", parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("kpiCard")
-        self.setStyleSheet(f"""
-            QFrame#kpiCard {{
-                background-color: {CARD_BG};
-                border-radius: 12px;
-                padding: 16px;
-                border: 1px solid {BORDER_COLOR};
-            }}
-        """)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMinimumHeight(120)
-        
+        self.title_label = QLabel(f"{icon} {title}")
+        self.value_label = QLabel(value)
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
-        
-        # Title
-        title_label = QLabel(f"{icon} {title}")
-        title_label.setStyleSheet(f"""
-            color: {TEXT_SECONDARY};
+        layout.addWidget(self.title_label)
+        layout.addWidget(self.value_label)
+
+    def apply_theme(self, theme: Dict[str, str]) -> None:
+        self.setStyleSheet(f"""
+            QFrame#kpiCard {{
+                background-color: {theme["card"]};
+                border-radius: 12px;
+                padding: 16px;
+                border: 1px solid {theme["border"]};
+            }}
+        """)
+        self.title_label.setStyleSheet(f"""
+            color: {theme["text_sec"]};
             font-size: 10pt;
             font-weight: 500;
         """)
-        layout.addWidget(title_label)
-        
-        # Value
-        value_label = QLabel(value)
-        value_label.setStyleSheet(f"""
-            color: {ACCENT_GREEN};
+        self.value_label.setStyleSheet(f"""
+            color: {theme["accent"]};
             font-size: 24pt;
             font-weight: bold;
         """)
-        layout.addWidget(value_label)
-
-
-class BarChartWidget(QWidget):
-    """Simple bar chart for spending visualization using QPainter."""
-
-    def __init__(self, data: List[Dict[str, Any]], parent=None) -> None:
-        super().__init__(parent)
-        self.data = data
-        self.setMinimumHeight(200)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-
-    def set_data(self, data: List[Dict[str, Any]]) -> None:
-        """Updates chart data and refreshes."""
-        self.data = data
-        self.update()
-
-    def paintEvent(self, event) -> None:
-        """Draws the bar chart."""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Background
-        painter.setBrush(QBrush(QColor(CARD_BG)))
-        painter.setPen(QPen(QColor(BORDER_COLOR), 1))
-        painter.drawRoundedRect(self.rect(), 12, 12)
-        
-        if not self.data:
-            painter.setPen(QColor(TEXT_SECONDARY))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Sin datos")
-            return
-        
-        # Chart dimensions
-        margin = 50
-        chart_width = self.width() - 2 * margin
-        chart_height = self.height() - 2 * margin
-        
-        # Max value for scaling
-        max_value = max((float(d.get("gasto_dia", 0)) for d in self.data), default=1)
-        if max_value == 0:
-            max_value = 1
-        
-        # Draw bars
-        bar_width = chart_width / len(self.data) * 0.7
-        spacing = chart_width / len(self.data) * 0.3
-        
-        for i, item in enumerate(self.data):
-            x = margin + i * (bar_width + spacing) + spacing / 2
-            value = float(item.get("gasto_dia", 0))
-            bar_height = (value / max_value) * chart_height if max_value > 0 else 0
-            
-            # Bar gradient color based on value
-            if value > 1.0:
-                color = ACCENT_RED
-            elif value > 0.5:
-                color = ACCENT_BLUE
-            else:
-                color = ACCENT_GREEN
-            
-            painter.setBrush(QBrush(QColor(color)))
-            painter.setPen(Qt.PenStyle.NoPen)
-            
-            y = self.height() - margin - bar_height
-            painter.drawRoundedRect(int(x), int(y), int(bar_width), int(bar_height), 4, 4)
-            
-            # Date label
-            painter.setPen(QColor(TEXT_SECONDARY))
-            painter.setFont(QFont("Segoe UI", 8))
-            fecha = item.get("fecha", "")
-            if fecha and len(fecha) >= 5:
-                fecha_corta = fecha[5:]  # MM-DD
-                painter.drawText(int(x), int(self.height() - margin + 20), 
-                               int(bar_width), 20, Qt.AlignmentFlag.AlignCenter, fecha_corta)
-            
-            # Value label
-            painter.setPen(QColor(ACCENT_GREEN))
-            painter.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            painter.drawText(int(x), int(y - 10), int(bar_width), 20, 
-                           Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter,
-                           f"${value:.2f}")
 
 
 class TelemetryDashboard(QWidget):
-    """
-    Dashboard de Telemetría con diseño Dark Aesthetic.
-    
-    Muestra:
-    - KPI Cards: Gasto Total, Tokens, Peticiones
-    - Gráfico de Barras: Gasto últimos 7 días
-    - Tabla: Registros recientes
-    """
-
-    def __init__(self, db_manager, parent=None) -> None:
+    """Dashboard de telemetría con KPIs y tabla de registros recientes."""
+    def __init__(self, db: DatabaseManager, parent=None) -> None:
         super().__init__(parent)
-        self.db = db_manager
-        self.setStyleSheet(f"background-color: {DARK_BG};")
-        
-        self._setup_ui()
-        self._refresh_data()
-        
-        # Auto-refresh every 30 seconds
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self._refresh_data)
-        self.timer.start(30000)
+        self.db = db
+        self.setObjectName("telemetryDashboard")
+        self._is_dark = True
 
-    def _setup_ui(self) -> None:
-        """Configura la interfaz del dashboard."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(16, 16, 16, 16)
         main_layout.setSpacing(16)
-        
-        # Title
-        title = QLabel("📊 Telemetría y Observabilidad")
-        title.setStyleSheet(f"""
-            color: {TEXT_PRIMARY};
-            font-size: 18pt;
-            font-weight: bold;
-            padding: 8px;
-        """)
-        main_layout.addWidget(title)
-        
-        # KPI Cards
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        self.title = QLabel("📊 Telemetría y Observabilidad")
+        main_layout.addWidget(self.title)
+
         kpi_layout = QHBoxLayout()
         kpi_layout.setSpacing(16)
-        
-        self.card_gasto = KPICard("Gasto Total (Mes)", "$0.00", "💵")
-        self.card_tokens = KPICard("Tokens Consumidos", "0", "🔢")
-        self.card_peticiones = KPICard("Peticiones API", "0", "📡")
-        
-        kpi_layout.addWidget(self.card_gasto)
-        kpi_layout.addWidget(self.card_tokens)
-        kpi_layout.addWidget(self.card_peticiones)
-        
-        main_layout.addLayout(kpi_layout)
-        
-        # Bar Chart
-        chart_label = QLabel("📈 Gasto Últimos 7 Días")
-        chart_label.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11pt; padding: 8px;")
-        main_layout.addWidget(chart_label)
-        
-        self.chart_widget = BarChartWidget([])
-        main_layout.addWidget(self.chart_widget)
-        
-        # Data Table
-        table_label = QLabel("📋 Registros Recientes")
-        table_label.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11pt; padding: 8px;")
-        main_layout.addWidget(table_label)
-        
+        self.kpi_costo = KPICard("Gasto Total (Mes)", "$0.00", "💰")
+        self.kpi_tokens = KPICard("Tokens Totales", "0", "🔤")
+        self.kpi_peticiones = KPICard("Peticiones API", "0", "📡")
+        kpi_layout.addWidget(self.kpi_costo)
+        kpi_layout.addWidget(self.kpi_tokens)
+        kpi_layout.addWidget(self.kpi_peticiones)
+        main_layout.addLayout(kpi_layout, stretch=1)
+
+        # Table
+        self.table_label = QLabel("📋 Registros Recientes")
+        main_layout.addWidget(self.table_label)
+
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
-            "Fecha/Hora", "Operación", "Modelo", "Input", "Output", "Costo USD"
+            "Timestamp", "Modelo", "Input Tokens", "Output Tokens",
+            "Costo (USD)", "Operación"
         ])
-        self.table.setStyleSheet(f"""
-            QTableWidget {{
-                background-color: transparent;
-                color: {TEXT_PRIMARY};
-                border: 1px solid {BORDER_COLOR};
-                border-radius: 8px;
-                gridline-color: {BORDER_COLOR};
-            }}
-            QTableWidget::item {{
-                padding: 8px;
-                border: none;
-            }}
-            QTableWidget::item:selected {{
-                background-color: {BORDER_COLOR};
-            }}
-            QHeaderView::section {{
-                background-color: {CARD_BG};
-                color: {TEXT_PRIMARY};
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-            }}
-        """)
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.verticalHeader().setVisible(False)
         self.table.setAlternatingRowColors(True)
+        self.table.setWordWrap(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        
-        main_layout.addWidget(self.table, stretch=1)
+        header = self.table.horizontalHeader()
+        if header is not None:
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        v_header = self.table.verticalHeader()
+        if v_header is not None:
+            v_header.setVisible(False)
+        main_layout.addWidget(self.table, stretch=8)
 
-    def _refresh_data(self) -> None:
-        """Actualiza todos los datos del dashboard."""
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        self.btn_refresh = QLabel("🔄 Actualizar cada 30s")
+        btn_layout.addWidget(self.btn_refresh)
+        main_layout.addLayout(btn_layout)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.refresh)
+        self.timer.start(30000)
+
+        self.apply_theme(True)
+        self.refresh()
+
+    def apply_theme(self, is_dark: bool) -> None:
+        self._is_dark = is_dark
+        theme = DARK if is_dark else LIGHT
+
+        self.setStyleSheet(f"""
+            QWidget#telemetryDashboard {{
+                background-color: {theme["bg"]};
+            }}
+        """)
+
+        self.title.setStyleSheet(f"""
+            color: {theme["text"]};
+            font-size: 18pt;
+            font-weight: bold;
+            padding: 8px 0;
+        """)
+
+        self.table_label.setStyleSheet(f"""
+            color: {theme["text"]};
+            font-size: 14pt;
+            font-weight: bold;
+            padding: 8px 0;
+        """)
+
+        self.btn_refresh.setStyleSheet(f"""
+            color: {theme["text_sec"]};
+            font-size: 9pt;
+            padding: 4px 12px;
+        """)
+
+        if is_dark:
+            table_qss = f"""
+                QTableWidget {{
+                    background-color: {theme["card"]};
+                    color: {theme["text"]};
+                    border: 1px solid {theme["border"]};
+                    border-radius: 8px;
+                    gridline-color: {theme["border"]};
+                    font-size: 10pt;
+                }}
+                QTableWidget::item {{
+                    padding: 6px 8px;
+                }}
+                QTableWidget::item:alternate {{
+                    background-color: #1a2744;
+                }}
+                QHeaderView::section {{
+                    background-color: {DARK["bg"]};
+                    color: {DARK["accent"]};
+                    padding: 6px;
+                    border: 1px solid {DARK["border"]};
+                    font-weight: bold;
+                }}
+            """
+        else:
+            table_qss = f"""
+                QTableWidget {{
+                    background-color: {theme["card"]};
+                    color: {theme["text"]};
+                    border: 1px solid {theme["border"]};
+                    border-radius: 8px;
+                    gridline-color: {theme["border"]};
+                    font-size: 10pt;
+                    selection-background-color: {theme["accent"]};
+                    selection-color: #FFFFFF;
+                }}
+                QTableWidget::item {{
+                    padding: 6px 8px;
+                }}
+                QTableWidget::item:alternate {{
+                    background-color: {theme["card_alt"]};
+                }}
+                QHeaderView::section {{
+                    background-color: #E2E8F0;
+                    color: #0F172A;
+                    font-weight: bold;
+                    border: none;
+                    border-right: 1px solid {theme["border"]};
+                    border-bottom: 2px solid {theme["accent"]};
+                    padding: 6px;
+                }}
+            """
+
+        self.table.setStyleSheet(table_qss)
+        if style := self.table.style():
+            style.unpolish(self.table)
+            style.polish(self.table)
+
+        self.kpi_costo.apply_theme(theme)
+        self.kpi_tokens.apply_theme(theme)
+        self.kpi_peticiones.apply_theme(theme)
+
+    def refresh(self) -> None:
         if not self.db:
             return
-        
-        # KPI Cards
-        gasto_total = self.db.obtener_gasto_total_mes()
-        self.card_gasto.findChild(QLabel, "", Qt.FindChildOption.FindDirectChildrenOnly)\
-            .setText(f"${gasto_total:.2f}")
-        
-        tokens = self.db.obtener_total_tokens()
-        self.card_tokens.findChild(QLabel, "", Qt.FindChildOption.FindDirectChildrenOnly)\
-            .setText(f"{tokens['total']:,}")
-        
-        peticiones = self.db.obtener_total_peticiones()
-        self.card_peticiones.findChild(QLabel, "", Qt.FindChildOption.FindDirectChildrenOnly)\
-            .setText(str(peticiones))
-        
-        # Bar Chart
-        gasto_7dias = self.db.obtener_gasto_ultimos_7_dias()
-        self.chart_widget.set_data(gasto_7dias)
-        
-        # Data Table
-        self._update_table()
+        try:
+            gasto = self.db.obtener_gasto_total_mes()
+            self.kpi_costo.value_label.setText(f"${gasto:.2f}")
 
-    def _update_table(self) -> None:
-        """Actualiza la tabla de registros recientes."""
-        registros = self.db.obtener_telemetria_reciente(20)
-        
-        self.table.setRowCount(len(registros))
-        
-        for i, row in enumerate(registros):
-            # Fecha
-            timestamp = row.get("timestamp", "")
-            if timestamp and len(timestamp) > 16:
-                timestamp = timestamp[:16].replace("T", " ")
-            item = QTableWidgetItem(timestamp)
-            item.setForeground(QColor(TEXT_SECONDARY))
-            self.table.setItem(i, 0, item)
-            
-            # Operación
-            operacion = row.get("tipo_operacion", "N/A")
-            item = QTableWidgetItem(operacion)
-            item.setForeground(QColor(TEXT_PRIMARY))
-            self.table.setItem(i, 1, item)
-            
-            # Modelo
-            modelo = row.get("modelo_usado", "N/A")
-            item = QTableWidgetItem(modelo)
-            item.setForeground(QColor(ACCENT_BLUE))
-            self.table.setItem(i, 2, item)
-            
-            # Input Tokens
-            input_tokens = row.get("input_tokens", 0)
-            item = QTableWidgetItem(f"{input_tokens:,}")
-            item.setForeground(QColor(TEXT_SECONDARY))
-            self.table.setItem(i, 3, item)
-            
-            # Output Tokens
-            output_tokens = row.get("output_tokens", 0)
-            item = QTableWidgetItem(f"{output_tokens:,}")
-            item.setForeground(QColor(TEXT_SECONDARY))
-            self.table.setItem(i, 4, item)
-            
-            # Costo
-            costo = row.get("costo_total_usd", 0.0)
-            item = QTableWidgetItem(f"${costo:.4f}")
-            item.setForeground(QColor(ACCENT_GREEN if costo > 0 else TEXT_SECONDARY))
-            self.table.setItem(i, 5, item)
-        
-        # Adjust column widths
-        self.table.resizeColumnsToContents()
+            tokens = self.db.obtener_total_tokens()
+            self.kpi_tokens.value_label.setText(f"{tokens['total']:,}")
+
+            peticiones = self.db.obtener_total_peticiones()
+            self.kpi_peticiones.value_label.setText(f"{peticiones:,}")
+
+            registros = self.db.obtener_telemetria_reciente(50)
+            self.table.setRowCount(len(registros))
+            theme = DARK if self._is_dark else LIGHT
+            for row_idx, reg in enumerate(registros):
+                ts = str(reg.get("timestamp", ""))
+                if len(ts) > 16:
+                    ts = ts[:16].replace("T", " ")
+                item_ts = QTableWidgetItem(ts)
+                item_ts.setForeground(QColor(theme["text_sec"]))
+                self.table.setItem(row_idx, 0, item_ts)
+
+                modelo = str(reg.get("modelo_usado", ""))
+                item_m = QTableWidgetItem(modelo)
+                item_m.setForeground(QColor(theme["accent"]))
+                self.table.setItem(row_idx, 1, item_m)
+
+                inp = reg.get("input_tokens", 0)
+                item_in = QTableWidgetItem(f"{inp:,}")
+                item_in.setForeground(QColor(theme["text_sec"]))
+                self.table.setItem(row_idx, 2, item_in)
+
+                out = reg.get("output_tokens", 0)
+                item_out = QTableWidgetItem(f"{out:,}")
+                item_out.setForeground(QColor(theme["text_sec"]))
+                self.table.setItem(row_idx, 3, item_out)
+
+                costo = reg.get("costo_total_usd", 0.0)
+                item_c = QTableWidgetItem(f"${costo:.4f}")
+                item_c.setForeground(QColor(theme["accent_green"] if costo > 0 else theme["text_sec"]))
+                self.table.setItem(row_idx, 4, item_c)
+
+                op = str(reg.get("tipo_operacion", ""))
+                item_op = QTableWidgetItem(op)
+                item_op.setForeground(QColor(theme["text"]))
+                self.table.setItem(row_idx, 5, item_op)
+
+            self.table.resizeRowsToContents()
+            if header := self.table.horizontalHeader():
+                header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+                header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+                header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+                header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+                header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+                header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
+            print(f"TelemetryDashboard refresh error: {e}")

@@ -14,13 +14,12 @@ import json
 import csv
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from contextlib import contextmanager
 
 from core.rag_classifier import (
     procesar_documento_rag,
-    DocumentoRAG,
-    cargar_documentos_rag
+    DocumentoRAG
 )
 
 
@@ -116,18 +115,18 @@ class RAGStore:
     def guardar_documento(self, metadata: Dict[str, Any]) -> int:
         """
         Guarda un documento clasificado en la base de datos.
-        
+
         Args:
             metadata: Metadata del documento desde procesar_documento_rag().
-            
+
         Returns:
             int: ID del documento guardado.
         """
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            
+
             cursor.execute("""
-                INSERT INTO DocumentosRAG 
+                INSERT INTO DocumentosRAG
                 (tipo, nombre, path, extension, tamano_bytes, columnas, filas, contenido_preview)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
@@ -140,15 +139,27 @@ class RAGStore:
                 metadata.get("filas", 0),
                 metadata.get("contenido_preview", "")
             ))
-            
+
             doc_id = cursor.lastrowid
-            
+            assert doc_id is not None
+
             if metadata["tipo"] == DocumentoRAG.RECETA:
                 self._guardar_recetas_csv(metadata, doc_id, conn)
             elif metadata["tipo"] in [DocumentoRAG.MANUAL_BPM, DocumentoRAG.GENERICO]:
                 self._guardar_documento_texto(metadata, doc_id, conn)
-            
+
             return doc_id
+
+    def _detect_delimiter(self, path: str) -> str:
+        """Detecta si el CSV usa coma o tabulador como delimitador."""
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                first = f.readline()
+                tabs = first.count('\t')
+                comas = first.count(',')
+                return '\t' if tabs > comas else ','
+        except (IOError, OSError, UnicodeDecodeError):
+            return ','
 
     def _guardar_recetas_csv(self, metadata: Dict[str, Any], doc_id: int, conn) -> None:
         """Guarda recetas desde CSV en tabla RecetasRAG."""
@@ -160,8 +171,9 @@ class RAGStore:
             recetas_duplicadas = 0
             recetas_actualizadas = 0
             
+            delimiter = self._detect_delimiter(path)
             with open(path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
+                reader = csv.DictReader(f, delimiter=delimiter)
                 
                 for row in reader:
                     # Soporte para múltiples nombres de columna
@@ -181,15 +193,20 @@ class RAGStore:
                     alergenos = (row.get('alergenos') or row.get('Alergenos') or 
                                 row.get('alérgenos') or 'ninguno')
                     instrucciones = (row.get('instrucciones') or row.get('Instrucciones') or 
-                                    row.get('preparacion') or '')
+                                     row.get('preparacion') or '')
+                    porciones_str = (row.get('porciones') or row.get('Porciones') or 
+                                    row.get('comensales') or row.get('Comensales') or '')
+                    porciones = int(porciones_str) if porciones_str and porciones_str.strip().isdigit() else None
                     
-                    # Verificar si ya existe por id_receta o nombre
-                    cursor.execute("""
-                        SELECT id, nombre FROM RecetasRAG 
-                        WHERE id_receta = ? OR nombre = ?
-                    """, (id_receta, nombre))
-                    
-                    existente = cursor.fetchone()
+                    # Verificar si ya existe por id_receta
+                    if id_receta:
+                        cursor.execute("""
+                            SELECT id FROM RecetasRAG 
+                            WHERE id_receta = ?
+                        """, (id_receta,))
+                        existente = cursor.fetchone()
+                    else:
+                        existente = None
                     
                     if existente:
                         recetas_duplicadas += 1
@@ -218,7 +235,7 @@ class RAGStore:
                                 UPDATE RecetasRAG 
                                 SET documento_id = ?, categoria = ?, tiempo_prep = ?, 
                                     costo = ?, ingredientes_json = ?, alergenos = ?, 
-                                    instrucciones = ?
+                                    instrucciones = ?, porciones = ?
                                 WHERE id = ?
                             """, (
                                 doc_id,
@@ -228,6 +245,7 @@ class RAGStore:
                                 ingredientes,
                                 alergenos,
                                 instrucciones,
+                                porciones,
                                 existente[0]
                             ))
                             recetas_actualizadas += 1
@@ -239,8 +257,8 @@ class RAGStore:
                         cursor.execute("""
                             INSERT INTO RecetasRAG 
                             (documento_id, id_receta, nombre, categoria, tiempo_prep, 
-                             costo, ingredientes_json, alergenos, instrucciones)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             costo, ingredientes_json, alergenos, instrucciones, porciones)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
                             doc_id,
                             id_receta,
@@ -250,14 +268,15 @@ class RAGStore:
                             float(costo) if costo else 0.0,
                             ingredientes,
                             alergenos,
-                            instrucciones
+                            instrucciones,
+                            porciones
                         ))
                         recetas_guardadas += 1
                         print(f"  [NEW] Nueva: {nombre}")
             
             print(f"\n  Resumen: {recetas_guardadas} nuevas, {recetas_actualizadas} actualizadas, {recetas_duplicadas} duplicadas")
             
-        except Exception as e:
+        except (ValueError, KeyError, json.JSONDecodeError) as e:
             print(f"Error guardando recetas: {e}")
 
     def _guardar_documento_texto(self, metadata: Dict[str, Any], doc_id: int, conn) -> None:
@@ -276,7 +295,7 @@ class RAGStore:
                     (documento_id, contenido_completo, palabras_clave)
                     VALUES (?, ?, ?)
                 """, (doc_id, contenido, json.dumps(palabras_clave)))
-        except Exception as e:
+        except (IOError, OSError, json.JSONDecodeError, ValueError) as e:
             print(f"Error guardando documento texto: {e}")
 
     def _extraer_palabras_clave(self, contenido: str, max_palabras: int = 20) -> List[str]:
@@ -288,7 +307,7 @@ class RAGStore:
         }
         
         palabras = contenido.lower().split()
-        frecuencia = {}
+        frecuencia: dict[str, int] = {}
         
         for palabra in palabras:
             palabra_limpia = ''.join(c for c in palabra if c.isalnum())
@@ -317,8 +336,9 @@ class RAGStore:
             lotes_duplicados = 0
             lotes_actualizados = 0
             
+            delimiter = self._detect_delimiter(path)
             with open(path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
+                reader = csv.DictReader(f, delimiter=delimiter)
                 
                 for row in reader:
                     # Soporte para múltiples nombres de columna
@@ -331,8 +351,8 @@ class RAGStore:
                     
                     # Si no hay producto_id pero hay Nombre, buscar en Catálogo
                     if not producto_id and (row.get('nombre') or row.get('Nombre')):
-                        nombre_producto = (row.get('nombre') or row.get('Nombre')).strip().title()
-                        with db_manager._get_connection() as conn:
+                        nombre_producto = ((row.get('nombre') or row.get('Nombre')) or '').strip().title()
+                        with db_manager.get_connection() as conn:
                             cursor = conn.cursor()
                             cursor.execute("SELECT id FROM Catalogo WHERE nombre = ?", (nombre_producto,))
                             prod_row = cursor.fetchone()
@@ -350,7 +370,7 @@ class RAGStore:
                         cantidad = float(cantidad_str)
                         if cantidad <= 0:
                             cantidad = 1
-                    except:
+                    except (ValueError, TypeError):
                         cantidad = 1
                     
                     unidad = (row.get('unidad') or row.get('Unidad') or 
@@ -361,7 +381,7 @@ class RAGStore:
                     if fecha_caducidad == '':
                         fecha_caducidad = None
                     
-                    with db_manager._get_connection() as conn:
+                    with db_manager.get_connection() as conn:
                         cursor = conn.cursor()
                         
                         # Verificar duplicado por id_lote si existe
@@ -401,7 +421,7 @@ class RAGStore:
             
             print(f"\n  Resumen: {lotes_guardados} nuevos, {lotes_actualizados} actualizados, {lotes_duplicados} duplicados")
                     
-        except Exception as e:
+        except (FileNotFoundError, IOError, sqlite3.Error, ValueError, KeyError) as e:
             print(f"Error guardando lotes: {e}")
         
         return doc_id
@@ -425,19 +445,16 @@ class RAGStore:
             productos_duplicados = 0
             productos_actualizados = 0
             
+            delimiter = self._detect_delimiter(path)
             with open(path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
+                reader = csv.DictReader(f, delimiter=delimiter)
                 
                 for row in reader:
                     # Soporte para múltiples nombres de columna
-                    id_producto = (row.get('id_producto') or row.get('ID_Producto') or 
-                                  row.get('id') or '').strip()
                     nombre = (row.get('nombre') or row.get('Nombre') or 
                              row.get('nombre_producto') or '').strip().title()
                     categoria = (row.get('categoria') or row.get('Categoria') or 
                                 row.get('Categoría') or '').strip().title()
-                    tipo_caducidad = (row.get('tipo_caducidad') or row.get('Tipo_Caducidad') or 
-                                     row.get('tipo') or 'Dinamica').strip().title()
                     vida_util = (row.get('vida_util_dias') or row.get('Vida_Util_Dias') or 
                                 row.get('vida_util') or '30')
                     
@@ -448,11 +465,11 @@ class RAGStore:
                             vida_util_dias = 365
                         elif vida_util_dias <= 0:
                             vida_util_dias = 30
-                    except:
+                    except (ValueError, TypeError):
                         vida_util_dias = 30
                     
                     # Verificar duplicado por nombre
-                    with db_manager._get_connection() as conn:
+                    with db_manager.get_connection() as conn:
                         cursor = conn.cursor()
                         cursor.execute("""
                             SELECT id, vida_util_dias, categoria 
@@ -487,7 +504,7 @@ class RAGStore:
             
             print(f"\n  Resumen: {productos_guardados} nuevos, {productos_actualizados} actualizados, {productos_duplicados} duplicados")
             
-        except Exception as e:
+        except (sqlite3.Error, ValueError, KeyError) as e:
             print(f"Error guardando catálogo: {e}")
         
         return doc_id
@@ -495,15 +512,12 @@ class RAGStore:
     def guardar_documentos(self, file_paths: List[str], db_manager) -> Dict[str, Any]:
         """
         Guarda múltiples documentos en la base de datos.
-        
+
         Args:
             file_paths: Lista de rutas de archivos.
             db_manager: DatabaseManager para operaciones CRUD.
-            
-        Returns:
-            Dict: Resumen de documentos guardados.
         """
-        resultados = {
+        resultados: Dict[str, Any] = {
             "total": len(file_paths),
             "guardados": 0,
             "recetas": 0,
@@ -514,16 +528,16 @@ class RAGStore:
             "errores": [],
             "documentos_ids": []
         }
-        
+
         for file_path in file_paths:
             try:
                 metadata = procesar_documento_rag(file_path)
                 doc_id = self.guardar_documento(metadata)
                 resultados["documentos_ids"].append(doc_id)
                 resultados["guardados"] += 1
-                
+
                 tipo = metadata["tipo"]
-                
+
                 if tipo == DocumentoRAG.RECETA:
                     resultados["recetas"] += 1
                 elif tipo == DocumentoRAG.CATALOGO:
@@ -536,10 +550,10 @@ class RAGStore:
                     resultados["manuales"] += 1
                 else:
                     resultados["genericos"] += 1
-                    
-            except Exception as e:
+
+            except (ValueError, KeyError, FileNotFoundError) as e:
                 resultados["errores"].append(f"{Path(file_path).name}: {str(e)}")
-        
+
         return resultados
 
     def obtener_documentos_por_tipo(self, tipo: str) -> List[Dict[str, Any]]:

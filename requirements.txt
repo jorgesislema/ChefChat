@@ -4,6 +4,7 @@ langchain-google-genai>=0.0.2
 langchain-anthropic>=0.1.0
 pydantic>=2.10.0
 PyQt6>=6.8.0
+PyQt6-stubs>=6.8.0
 keyring>=25.0
 pytest>=8.0
 pytest-qt>=4.4

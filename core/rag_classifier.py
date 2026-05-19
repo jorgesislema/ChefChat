@@ -12,7 +12,6 @@ Detecta automáticamente el tipo de documento cargado:
 from pathlib import Path
 from typing import Dict, Any, List
 import csv
-import json
 
 
 class DocumentoRAG:
@@ -54,8 +53,15 @@ def detectar_tipo_documento(file_path: str) -> str:
     # 2. Detectar por contenido (CSV)
     if extension == ".csv":
         try:
+            # Detectar delimitador
             with open(file_path, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f)
+                first = f.readline()
+                tabs = first.count('\t')
+                comas = first.count(',')
+                delim = '\t' if tabs > comas else ','
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f, delimiter=delim)
                 headers = next(reader, [])
                 headers_lower = [h.lower().strip() for h in headers]
                 headers_text = " ".join(headers_lower)
@@ -78,7 +84,7 @@ def detectar_tipo_documento(file_path: str) -> str:
                 if "fecha_ingreso" in headers_lower and "cantidad_actual" in headers_lower:
                     return DocumentoRAG.LOTES
                 
-        except Exception as e:
+        except (OSError, csv.Error, UnicodeDecodeError) as e:
             print(f"Error leyendo CSV: {e}")
     
     # 3. Detectar por contenido (TXT/MD)
@@ -104,7 +110,7 @@ def detectar_tipo_documento(file_path: str) -> str:
                 if receta_count >= 2:
                     return DocumentoRAG.RECETA
                 
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             print(f"Error leyendo TXT/MD: {e}")
     
     # Default: genérico
@@ -139,11 +145,16 @@ def procesar_documento_rag(file_path: str) -> Dict[str, Any]:
     if path.suffix.lower() == ".csv":
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f)
+                lines = f.readlines()
+            if lines:
+                tabs = lines[0].count('\t')
+                comas = lines[0].count(',')
+                delim = '\t' if tabs > comas else ','
+                reader = csv.reader(lines, delimiter=delim)
                 headers = next(reader, [])
                 metadata["columnas"] = headers
-                metadata["filas"] = sum(1 for _ in reader)
-        except Exception as e:
+                metadata["filas"] = len(lines) - 1
+        except (OSError, csv.Error, UnicodeDecodeError) as e:
             metadata["error"] = str(e)
     
     elif path.suffix.lower() in [".txt", ".md"]:
@@ -152,7 +163,7 @@ def procesar_documento_rag(file_path: str) -> Dict[str, Any]:
                 contenido = f.read(500)
                 metadata["contenido_preview"] = contenido[:200] + "..." if len(contenido) > 200 else contenido
                 metadata["filas"] = contenido.count('\n') + 1
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             metadata["error"] = str(e)
     
     # Mensaje descriptivo por tipo
@@ -178,38 +189,43 @@ def cargar_documentos_rag(file_paths: List[str]) -> Dict[str, Any]:
     Returns:
         Dict con resumen de documentos cargados por tipo.
     """
-    resultados = {
-        "total": len(file_paths),
-        "recetas": 0,
-        "catalogo": 0,
-        "lotes": 0,
-        "manuales": 0,
-        "genericos": 0,
-        "errores": [],
-        "documentos": []
-    }
+    recetas = 0
+    catalogo = 0
+    lotes = 0
+    manuales = 0
+    genericos = 0
+    errores: List[str] = []
+    documentos: List[Dict[str, Any]] = []
     
     for file_path in file_paths:
         try:
             metadata = procesar_documento_rag(file_path)
-            resultados["documentos"].append(metadata)
+            documentos.append(metadata)
             
-            tipo = metadata["tipo"]
+            tipo = metadata.get("tipo")
             if tipo == DocumentoRAG.RECETA:
-                resultados["recetas"] += 1
+                recetas += 1
             elif tipo == DocumentoRAG.CATALOGO:
-                resultados["catalogo"] += 1
+                catalogo += 1
             elif tipo == DocumentoRAG.LOTES:
-                resultados["lotes"] += 1
+                lotes += 1
             elif tipo == DocumentoRAG.MANUAL_BPM:
-                resultados["manuales"] += 1
+                manuales += 1
             else:
-                resultados["genericos"] += 1
-                
-        except Exception as e:
-            resultados["errores"].append(f"{Path(file_path).name}: {str(e)}")
+                genericos += 1
+        except (OSError, ValueError) as e:
+            errores.append(f"{Path(file_path).name}: {e}")
     
-    return resultados
+    return {
+        "total": len(file_paths),
+        "recetas": recetas,
+        "catalogo": catalogo,
+        "lotes": lotes,
+        "manuales": manuales,
+        "genericos": genericos,
+        "errores": errores,
+        "documentos": documentos
+    }
 
 
 def generar_resumen_carga(resultados: Dict[str, Any]) -> str:
