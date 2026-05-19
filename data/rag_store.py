@@ -115,16 +115,25 @@ class RAGStore:
     def guardar_documento(self, metadata: Dict[str, Any]) -> int:
         """
         Guarda un documento clasificado en la base de datos.
-
+        
         Args:
             metadata: Metadata del documento desde procesar_documento_rag().
-
+            
         Returns:
-            int: ID del documento guardado.
+            int: ID del documento guardado, o -1 si ya existe (duplicado).
         """
         with self._get_connection() as conn:
             cursor = conn.cursor()
-
+            
+            # Verificar si ya existe un documento con el mismo nombre y tipo
+            cursor.execute("""
+                SELECT id FROM DocumentosRAG 
+                WHERE nombre = ? AND tipo = ? AND estado = 'activo'
+            """, (metadata["nombre"], metadata["tipo"]))
+            existente = cursor.fetchone()
+            if existente:
+                return -existente[0]  # Negativo = duplicado, valor = ID existente
+            
             cursor.execute("""
                 INSERT INTO DocumentosRAG
                 (tipo, nombre, path, extension, tamano_bytes, columnas, filas, contenido_preview)
@@ -520,19 +529,28 @@ class RAGStore:
         resultados: Dict[str, Any] = {
             "total": len(file_paths),
             "guardados": 0,
+            "duplicados": 0,
             "recetas": 0,
             "catalogo": 0,
             "lotes": 0,
             "manuales": 0,
             "genericos": 0,
             "errores": [],
-            "documentos_ids": []
+            "documentos_ids": [],
+            "duplicados_nombres": []
         }
 
         for file_path in file_paths:
             try:
                 metadata = procesar_documento_rag(file_path)
                 doc_id = self.guardar_documento(metadata)
+                
+                if doc_id < 0:
+                    # Duplicado
+                    resultados["duplicados"] += 1
+                    resultados["duplicados_nombres"].append(metadata["nombre"])
+                    continue
+                
                 resultados["documentos_ids"].append(doc_id)
                 resultados["guardados"] += 1
 
@@ -604,17 +622,18 @@ class RAGStore:
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT d.*, t.palabras_clave
+                SELECT d.*, t.palabras_clave, t.contenido_completo
                 FROM DocumentosRAG d
                 LEFT JOIN DocumentosTexto t ON d.id = t.documento_id
                 WHERE d.estado = 'activo'
                 AND (
                     d.nombre LIKE ? OR
                     d.columnas LIKE ? OR
-                    t.palabras_clave LIKE ?
+                    t.palabras_clave LIKE ? OR
+                    d.contenido_preview LIKE ?
                 )
                 ORDER BY d.fecha_ingreso DESC
-            """, (f'%{query}%', f'%{query}%', f'%{query}%'))
+            """, (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
             
             return [dict(row) for row in cursor.fetchall()]
 

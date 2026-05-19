@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>ChefChat Pro v1.0 - Documentacion</title>
+    <style>
+        @page { size: A4; margin: 20mm 15mm; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; color: #1E293B; line-height: 1.7; font-size: 10pt; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { color: #2563EB; border-bottom: 3px solid #2563EB; padding-bottom: 10px; }
+        h2 { color: #1E3A8A; border-left: 4px solid #2563EB; padding-left: 10px; margin-top: 25px; }
+        h3 { color: #334155; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th { background: #1E293B; color: #FFF; padding: 8px; text-align: left; }
+        td { border: 1px solid #E2E8F0; padding: 8px; }
+        tr:nth-child(even) { background: #F8FAFC; }
+        code { background: #E2E8F0; padding: 2px 5px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 9pt; }
+        pre { background: #1E293B; color: #F8FAFC; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 9pt; }
+        @media print { body { max-width: none; } }
+    </style>
+</head>
+<body>
+    <h1>ChefChat Pro v1.0 - Manual Operativo</h1>
+    <h1>ChefChat Pro - Resumen del Proyecto</h1>
+<h2>1. Vision General</h2>
+<p>ChefChat Pro es un asistente de escritorio para gestion de restaurantes que combina IA conversacional, agentes especializados con prompts individuales, RAG (Retrieval-Augmented Generation) e integracion con Microsoft Office. Construido con PyQt6 para Windows, utiliza un sistema multiagente donde cada agente tiene su propio prompt de sistema y usa el LLM seleccionado por el usuario.</p>
+<h2>2. Estructura del Repositorio</h2>
+<div class="codehilite"><pre><span></span><code><span class="n">ChefChat</span><span class="o">/</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">main</span><span class="o">.</span><span class="n">py</span><span class="w">                    </span><span class="c1"># Punto de entrada de la aplicacion</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">documentacion</span><span class="o">.</span><span class="n">py</span><span class="w">           </span><span class="c1"># Generador de documentacion Word + HTML</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">requirements</span><span class="o">.</span><span class="n">txt</span><span class="w">           </span><span class="c1"># Dependencias Python</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">chefchat</span><span class="o">.</span><span class="n">db</span><span class="w">                </span><span class="c1"># Base de datos SQLite (17+ tablas)</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">pyrightconfig</span><span class="o">.</span><span class="n">json</span><span class="w">         </span><span class="c1"># Configuracion de type checking</span>
+<span class="err">├──</span><span class="w"> </span><span class="o">.</span><span class="n">gitignore</span><span class="w">                 </span><span class="c1"># Archivos excluidos de git</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">agents</span><span class="o">/</span><span class="w">                    </span><span class="c1"># Agentes de IA y orquestacion</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">orchestrator</span><span class="o">.</span><span class="n">py</span><span class="w">        </span><span class="c1"># Orquestador principal con routing y alertas</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">multiagent</span><span class="o">.</span><span class="n">py</span><span class="w">          </span><span class="c1"># Sistema multiagente (5 agentes + Planner + Executor)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">tools</span><span class="o">.</span><span class="n">py</span><span class="w">               </span><span class="c1"># 58 herramientas operativas</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">alertas</span><span class="o">.</span><span class="n">py</span><span class="w">             </span><span class="c1"># Sistema de alertas cruzadas entre agentes</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">mcp_client</span><span class="o">.</span><span class="n">py</span><span class="w">          </span><span class="c1"># Cliente MCP para Office</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">core</span><span class="o">/</span><span class="w">                      </span><span class="c1"># Componentes centrales</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="n">py</span><span class="w">              </span><span class="c1"># Configuracion y 7 proveedores AI</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">models</span><span class="o">.</span><span class="n">py</span><span class="w">              </span><span class="c1"># Modelos Pydantic y contratos</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">security</span><span class="o">.</span><span class="n">py</span><span class="w">            </span><span class="c1"># Validacion de seguridad</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">rag_classifier</span><span class="o">.</span><span class="n">py</span><span class="w">      </span><span class="c1"># Clasificador automatico de documentos</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">data</span><span class="o">/</span><span class="w">                      </span><span class="c1"># Gestion de datos y RAG</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">db_manager</span><span class="o">.</span><span class="n">py</span><span class="w">          </span><span class="c1"># Gestor SQLite con seed_mermas y personal</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">rag_store</span><span class="o">.</span><span class="n">py</span><span class="w">           </span><span class="c1"># Almacen RAG con deteccion de duplicados</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">menu_semanal</span><span class="o">.</span><span class="n">py</span><span class="w">        </span><span class="c1"># CRUD MenuSemanalPro con RAG</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">data_source</span><span class="o">/</span><span class="w">               </span><span class="c1"># Fuentes de datos externas</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="mi">1</span><span class="n">_recetas</span><span class="o">/</span><span class="w">             </span><span class="c1"># 18 archivos CSV de recetas</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="mi">3</span><span class="n">_inventario</span><span class="o">/</span><span class="w">          </span><span class="c1"># Catalogo y lotes de inventario</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">evaluation</span><span class="o">/</span><span class="w">                </span><span class="c1"># Evaluaciones y metricas</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="p">[</span><span class="n">archivos</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">evaluacion</span><span class="p">]</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">gui</span><span class="o">/</span><span class="w">                       </span><span class="c1"># Interfaz grafica PyQt6</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">main_window</span><span class="o">.</span><span class="n">py</span><span class="w">         </span><span class="c1"># Ventana principal con sidebar</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">worker</span><span class="o">.</span><span class="n">py</span><span class="w">              </span><span class="c1"># Worker thread con HITL</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">telemetry_view</span><span class="o">.</span><span class="n">py</span><span class="w">      </span><span class="c1"># Dashboard de telemetria</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">ops</span><span class="o">/</span><span class="w">                       </span><span class="c1"># Operaciones y seguridad</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">guardrails</span><span class="o">.</span><span class="n">py</span><span class="w">          </span><span class="c1"># Proteccion contra inyeccion de prompts</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">prompting</span><span class="o">/</span><span class="w">                 </span><span class="c1"># Optimizacion de prompts</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">dspy_optimizer</span><span class="o">.</span><span class="n">py</span><span class="w">      </span><span class="c1"># Optimizador estilo DSPy</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">scripts</span><span class="o">/</span><span class="w">                   </span><span class="c1"># Scripts de utilidad</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">data_seeder</span><span class="o">.</span><span class="n">py</span><span class="w">         </span><span class="c1"># Poblacion inicial de datos</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="p">[</span><span class="n">scripts</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">diagnostico</span><span class="p">]</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">tests</span><span class="o">/</span><span class="w">                     </span><span class="c1"># 38 tests unitarios e integracion</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="p">[</span><span class="n">archivos</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">prueba</span><span class="p">]</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">plantillas</span><span class="o">/</span><span class="w">                </span><span class="c1"># Plantillas Office</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">imagenes</span><span class="o">/</span><span class="w">                  </span><span class="c1"># Recursos graficos</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">telemetry_exports</span><span class="o">/</span><span class="w">         </span><span class="c1"># Exportaciones de telemetria</span>
+<span class="err">│</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">docs_internos</span><span class="o">/</span><span class="w">             </span><span class="c1"># Documentacion interna</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">resumen</span><span class="o">.</span><span class="n">md</span><span class="w">             </span><span class="c1"># ESTE ARCHIVO</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">architecture</span><span class="o">.</span><span class="n">md</span><span class="w">        </span><span class="c1"># Arquitectura conceptual</span>
+<span class="w">    </span><span class="err">└──</span><span class="w"> </span><span class="p">[</span><span class="mi">17</span><span class="w"> </span><span class="n">documentos</span><span class="p">]</span>
+</code></pre></div>
+
+<h2>3. Arquitectura del Sistema</h2>
+<h3>3.1 Patron Principal</h3>
+<ul>
+<li><strong>Clean Architecture + MVC + Multiagente con LLM compartido</strong></li>
+<li>Separacion estricta entre GUI (PyQt6), logica de negocio (Pydantic) e infraestructura</li>
+</ul>
+<h3>3.2 Componentes Clave</h3>
+<table>
+<thead>
+<tr>
+<th>Componente</th>
+<th>Responsabilidad</th>
+<th>Tecnologia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Orchestrator</td>
+<td>Routing con 9 prioridades + alertas cruzadas</td>
+<td>LangChain + regex</td>
+</tr>
+<tr>
+<td>Multiagent System</td>
+<td>5 agentes con prompts individuales + LLM</td>
+<td>ABC + LangChain</td>
+</tr>
+<tr>
+<td>AlertManager</td>
+<td>Alertas proactivas entre agentes (1er mensaje)</td>
+<td>SQLite + heuristicas</td>
+</tr>
+<tr>
+<td>Guardrails</td>
+<td>Proteccion contra inyeccion de prompts</td>
+<td>23 patrones</td>
+</tr>
+<tr>
+<td>RAG Engine</td>
+<td>Busqueda semantica en documentos</td>
+<td>SQLite LIKE + full text</td>
+</tr>
+<tr>
+<td>MCP Client</td>
+<td>Integracion con Word/Excel/PowerPoint</td>
+<td>COM automation</td>
+</tr>
+<tr>
+<td>HITL Controller</td>
+<td>Aprobacion humana antes de acciones criticas</td>
+<td>threading.Event + Qt</td>
+</tr>
+<tr>
+<td>Telemetry</td>
+<td>Registro de metricas y rendimiento</td>
+<td>SQLite + CSV/JSON</td>
+</tr>
+</tbody>
+</table>
+<h3>3.3 Proveedores de IA</h3>
+<table>
+<thead>
+<tr>
+<th>Proveedor</th>
+<th>Modelo</th>
+<th>Costo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DeepSeek</td>
+<td>deepseek-chat</td>
+<td>Bajo</td>
+</tr>
+<tr>
+<td>OpenRouter</td>
+<td>MiniMax 2.7b</td>
+<td>Bajo</td>
+</tr>
+<tr>
+<td>Ollama</td>
+<td>llama3.2, mistral</td>
+<td>Gratis</td>
+</tr>
+<tr>
+<td>OpenAI</td>
+<td>gpt-4o</td>
+<td>Medio</td>
+</tr>
+<tr>
+<td>Claude</td>
+<td>claude-3-5-sonnet</td>
+<td>Medio</td>
+</tr>
+<tr>
+<td>Gemini</td>
+<td>gemini-1.5-flash</td>
+<td>Bajo</td>
+</tr>
+<tr>
+<td>OpenCode</td>
+<td>big-pickle</td>
+<td>Gratis</td>
+</tr>
+</tbody>
+</table>
+<h2>4. Flujo de Procesamiento</h2>
+<h3>4.1 Flujo Principal de Peticion</h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Usuario</span><span class="w"> </span><span class="n">envia</span><span class="w"> </span><span class="n">peticion</span><span class="w"> </span><span class="n">en</span><span class="w"> </span><span class="n">GUI</span><span class="w"> </span><span class="p">(</span><span class="n">selecciona</span><span class="w"> </span><span class="n">agente</span><span class="w"> </span><span class="n">o</span><span class="w"> </span><span class="n">modo</span><span class="w"> </span><span class="n">Auto</span><span class="p">)</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Guardrails</span><span class="w"> </span><span class="nb">val</span><span class="n">ida</span><span class="w"> </span><span class="n">la</span><span class="w"> </span><span class="n">entrada</span>
+<span class="mf">3.</span><span class="w"> </span><span class="ow">Or</span><span class="n">chestrator</span><span class="w"> </span><span class="n">clasifica</span><span class="w"> </span><span class="n">por</span><span class="w"> </span><span class="n">prioridad</span><span class="w"> </span><span class="p">(</span><span class="mf">9</span><span class="w"> </span><span class="n">niveles</span><span class="p">):</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">1</span><span class="p">:</span><span class="w"> </span><span class="nb">Exp</span><span class="ow">or</span><span class="n">tacion</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">Word</span><span class="o">/</span><span class="n">Excel</span><span class="o">/</span><span class="n">PPT</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">2</span><span class="p">:</span><span class="w"> </span><span class="n">Menu</span><span class="w"> </span><span class="n">semanal</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">3</span><span class="p">:</span><span class="w"> </span><span class="n">Busqueda</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">documentos</span><span class="w"> </span><span class="p">(</span><span class="n">RAG</span><span class="p">)</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">3.5</span><span class="p">:</span><span class="w"> </span><span class="n">Consultas</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">personal</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">4</span><span class="p">:</span><span class="w"> </span><span class="n">Receta</span><span class="w"> </span><span class="n">por</span><span class="w"> </span><span class="n">ID</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">5</span><span class="p">:</span><span class="w"> </span><span class="n">Menu</span><span class="w"> </span><span class="n">por</span><span class="w"> </span><span class="n">ingredientes</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">6</span><span class="p">:</span><span class="w"> </span><span class="n">Mermas</span><span class="w"> </span><span class="n">con</span><span class="w"> </span><span class="n">extraccion</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">fecha</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">7</span><span class="p">:</span><span class="w"> </span><span class="n">Receta</span><span class="w"> </span><span class="n">por</span><span class="w"> </span><span class="n">nombre</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">8</span><span class="p">:</span><span class="w"> </span><span class="n">Herramientas</span><span class="w"> </span><span class="n">detectables</span>
+<span class="w">   </span><span class="n">PRI</span><span class="w"> </span><span class="mf">9</span><span class="p">:</span><span class="w"> </span><span class="n">LLM</span><span class="w"> </span><span class="n">directo</span><span class="w"> </span><span class="p">(</span><span class="n">fallback</span><span class="p">)</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Si</span><span class="w"> </span><span class="n">agente</span><span class="w"> </span><span class="kr">for</span><span class="n">zado</span><span class="p">:</span><span class="w"> </span><span class="n">ruteo</span><span class="w"> </span><span class="n">directo</span><span class="w"> </span><span class="n">al</span><span class="w"> </span><span class="n">agente</span><span class="w"> </span><span class="n">con</span><span class="w"> </span><span class="n">su</span><span class="w"> </span><span class="n">prompt</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">AlertManager</span><span class="w"> </span><span class="n">inyecta</span><span class="w"> </span><span class="n">alertas</span><span class="w"> </span><span class="n">cruzadas</span><span class="w"> </span><span class="p">(</span><span class="n">solo</span><span class="w"> </span><span class="mf">1</span><span class="n">er</span><span class="w"> </span><span class="n">mensaje</span><span class="p">)</span>
+<span class="mf">6.</span><span class="w"> </span><span class="kr">Cont</span><span class="n">exto</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="nb">exp</span><span class="ow">or</span><span class="n">tacion</span><span class="w"> </span><span class="n">guardado</span><span class="w"> </span><span class="n">automaticamente</span>
+<span class="mf">7.</span><span class="w"> </span><span class="n">Respuesta</span><span class="w"> </span><span class="n">enviada</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">GUI</span>
+</code></pre></div>
+
+<h3>4.2 Sistema Multiagente (v2.0)</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Cada</span><span class="w"> </span><span class="n">agente</span><span class="w"> </span><span class="nl">tiene:</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Su</span><span class="w"> </span><span class="n">propio</span><span class="w"> </span><span class="n">system_prompt</span><span class="w"> </span><span class="n">en</span><span class="w"> </span><span class="n">ingles</span><span class="w"> </span><span class="p">(</span><span class="n">optimizado</span><span class="w"> </span><span class="n">para</span><span class="w"> </span><span class="n">tokens</span><span class="p">)</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Instruccion</span><span class="w"> </span><span class="k">final</span><span class="o">:</span><span class="w"> </span><span class="s">&quot;ALWAYS respond in Spanish&quot;</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Acceso</span><span class="w"> </span><span class="n">al</span><span class="w"> </span><span class="n">LLM</span><span class="w"> </span><span class="n">compartido</span><span class="w"> </span><span class="n">seleccionado</span><span class="w"> </span><span class="n">por</span><span class="w"> </span><span class="n">el</span><span class="w"> </span><span class="n">usuario</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Keywords</span><span class="w"> </span><span class="n">para</span><span class="w"> </span><span class="n">deteccion</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">intencion</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Tools</span><span class="w"> </span><span class="n">deterministas</span><span class="w"> </span><span class="n">como</span><span class="w"> </span><span class="n">primera</span><span class="w"> </span><span class="n">opcion</span>
+<span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">LLM</span><span class="w"> </span><span class="n">como</span><span class="w"> </span><span class="n">fallback</span><span class="w"> </span><span class="n">con</span><span class="w"> </span><span class="n">datos</span><span class="w"> </span><span class="n">del</span><span class="w"> </span><span class="n">RAG</span>
+
+<span class="nl">Agentes:</span>
+<span class="w">  </span><span class="mf">1.</span><span class="w"> </span><span class="n">RecipeAgent</span><span class="w"> </span><span class="p">(</span><span class="n">Chef</span><span class="w"> </span><span class="n">Ejecutivo</span><span class="p">)</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Prompt:</span><span class="w"> </span><span class="n">recetas</span><span class="p">,</span><span class="w"> </span><span class="n">ingredientes</span><span class="p">,</span><span class="w"> </span><span class="n">preparacion</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Tools:</span><span class="w"> </span><span class="n">buscar_receta</span><span class="p">,</span><span class="w"> </span><span class="n">buscar_recetas_con_ingrediente</span><span class="p">,</span><span class="w"> </span><span class="n">escalar_receta</span>
+
+<span class="w">  </span><span class="mf">2.</span><span class="w"> </span><span class="n">InventoryAgent</span><span class="w"> </span><span class="p">(</span><span class="n">Jefe</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Inventario</span><span class="p">)</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Prompt:</span><span class="w"> </span><span class="n">stock</span><span class="p">,</span><span class="w"> </span><span class="n">caducidades</span><span class="p">,</span><span class="w"> </span><span class="n">compras</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Tools:</span><span class="w"> </span><span class="n">productos_por_caducar</span><span class="p">,</span><span class="w"> </span><span class="n">verificar_stock_bajo</span><span class="p">,</span><span class="w"> </span><span class="n">registrar_compra</span>
+
+<span class="w">  </span><span class="mf">3.</span><span class="w"> </span><span class="n">MenuAgent</span><span class="w"> </span><span class="p">(</span><span class="n">Chef</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Planificacion</span><span class="p">)</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Prompt:</span><span class="w"> </span><span class="n">menus</span><span class="w"> </span><span class="n">semanales</span><span class="p">,</span><span class="w"> </span><span class="n">anti</span><span class="o">-</span><span class="n">desperdicio</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Tools:</span><span class="w"> </span><span class="n">consultar_menu_semanal</span><span class="p">,</span><span class="w"> </span><span class="n">menu_anti_desperdicio</span><span class="p">,</span><span class="w"> </span><span class="n">agregar_plato_menu</span>
+
+<span class="w">  </span><span class="mf">4.</span><span class="w"> </span><span class="n">WasteAgent</span><span class="w"> </span><span class="p">(</span><span class="n">Controlador</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Mermas</span><span class="p">)</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Prompt:</span><span class="w"> </span><span class="n">reportes</span><span class="p">,</span><span class="w"> </span><span class="n">dashboard</span><span class="p">,</span><span class="w"> </span><span class="n">clasificacion</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Tools:</span><span class="w"> </span><span class="n">reporte_mermas</span><span class="p">,</span><span class="w"> </span><span class="n">registrar_merma</span><span class="p">,</span><span class="w"> </span><span class="n">dashboard_sobrantes</span>
+
+<span class="w">  </span><span class="mf">5.</span><span class="w"> </span><span class="n">DocumentAgent</span><span class="w"> </span><span class="p">(</span><span class="n">Oficial</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Cumplimiento</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="n">Personal</span><span class="p">)</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Prompt:</span><span class="w"> </span><span class="n">documentos</span><span class="w"> </span><span class="n">RAG</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">gestion</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">personal</span>
+<span class="w">     </span><span class="o">-</span><span class="w"> </span><span class="nl">Tools:</span><span class="w"> </span><span class="n">buscar_documento</span><span class="p">,</span><span class="w"> </span><span class="n">consultar_turno_hoy</span><span class="p">,</span><span class="w"> </span><span class="n">consultar_personal_activo</span><span class="p">,</span>
+<span class="w">              </span><span class="n">consultar_personal_ausente</span><span class="p">,</span><span class="w"> </span><span class="n">registrar_ausencia</span><span class="p">,</span><span class="w"> </span><span class="n">registrar_permiso_rapido</span>
+</code></pre></div>
+
+<h2>5. Base de Datos</h2>
+<h3>5.1 Tablas Principales</h3>
+<table>
+<thead>
+<tr>
+<th>Tabla</th>
+<th>Descripcion</th>
+<th>Novedades v2.0</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RecetasRAG</td>
+<td>Recetas con busqueda semantica</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Catalogo</td>
+<td>Productos con vida util</td>
+<td>+64 items con nombres CSV</td>
+</tr>
+<tr>
+<td>Inventario</td>
+<td>Stock de ingredientes</td>
+<td>+referencias Catalogo corregidas</td>
+</tr>
+<tr>
+<td>Mermas</td>
+<td>Registro de desperdicios</td>
+<td>+seed_mermas_realistas (160 registros)</td>
+</tr>
+<tr>
+<td>MenuSemanalPro</td>
+<td>Menus semanales</td>
+<td>+28 platos (Lunes-Domingo)</td>
+</tr>
+<tr>
+<td>Trabajadores</td>
+<td>Personal del restaurante</td>
+<td>+tipo_contrato, estado, ausencias</td>
+</tr>
+<tr>
+<td>DocumentosRAG</td>
+<td>Documentos cargados</td>
+<td>+deteccion de duplicados</td>
+</tr>
+<tr>
+<td>DocumentosTexto</td>
+<td>Contenido completo de docs</td>
+<td>+contenido_completo</td>
+</tr>
+<tr>
+<td>Telemetry</td>
+<td>Metricas de rendimiento</td>
+<td>-</td>
+</tr>
+<tr>
+<td>SobrantesReutilizables</td>
+<td>Sobrantes por turno</td>
+<td>+dashboard</td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 Trabajadores - Columnas nuevas</h3>
+<table>
+<thead>
+<tr>
+<th>Columna</th>
+<th>Proposito</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>tipo_contrato</td>
+<td>fijo / temporal</td>
+</tr>
+<tr>
+<td>estado</td>
+<td>activo / reposo_medico / permiso_maternidad / vacaciones / suspendido</td>
+</tr>
+<tr>
+<td>fecha_inicio_contrato</td>
+<td>Inicio del contrato</td>
+</tr>
+<tr>
+<td>fecha_fin_contrato</td>
+<td>Fin (temporales)</td>
+</tr>
+<tr>
+<td>fecha_inicio_ausencia</td>
+<td>Inicio de baja</td>
+</tr>
+<tr>
+<td>fecha_fin_ausencia</td>
+<td>Fin de baja / retorno</td>
+</tr>
+<tr>
+<td>motivo_ausencia</td>
+<td>Razon de la ausencia</td>
+</tr>
+</tbody>
+</table>
+<h2>6. Herramientas Nuevas (v2.0)</h2>
+<h3>6.1 Compras Inteligentes</h3>
+<ul>
+<li><code>registrar_compra</code>: Lenguaje natural → "se compro 3 kintales de harina caduca 12-03-2027"</li>
+<li>Detecta: producto, cantidad, unidad, fecha caducidad, categoria, vida util</li>
+</ul>
+<h3>6.2 Permisos y Personal</h3>
+<ul>
+<li><code>registrar_permiso_rapido</code>: "juan saco permiso por paternidad 6 dias"</li>
+<li><code>consultar_turno_hoy</code>: Personal activo hoy por turno</li>
+<li><code>consultar_personal_activo</code>: Todos los activos</li>
+<li><code>consultar_personal_ausente</code>: Bajas con fechas de retorno</li>
+<li><code>registrar_ausencia</code>: Registro formal de ausencia</li>
+<li><code>reincorporar_trabajador</code>: Alta tras ausencia</li>
+</ul>
+<h3>6.3 Inventario</h3>
+<ul>
+<li><code>dar_de_baja</code>: Rotura/dano → "plato sopero, 5, piezas, rotura, 25.00"</li>
+<li><code>seed_mermas</code>: Genera datos realistas de mermas (160 registros/30 dias)</li>
+</ul>
+<h3>6.4 Registro de Mermas</h3>
+<ul>
+<li><code>registrar_merma</code>: Acepta formato clasico y lenguaje natural</li>
+<li>"23 kilos de cerdo de merma"</li>
+<li>"3 kg de pan se echo a perder"</li>
+<li>"cebolla, 2.5, kg, se echo a perder, 1.50"</li>
+</ul>
+<h2>7. Alertas Cruzadas (Nuevo)</h2>
+<p><code>agents/alertas.py</code> - Sistema que inyecta alertas proactivas al final de cada respuesta (solo primer mensaje):</p>
+<table>
+<thead>
+<tr>
+<th>Tipo</th>
+<th>Que verifica</th>
+<th>Sugerencia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Personal</td>
+<td>Quien esta de baja, fecha retorno</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Caducidad</td>
+<td>Productos a 3 dias</td>
+<td>Recetas para aprovecharlos</td>
+</tr>
+<tr>
+<td>Stock bajo</td>
+<td>&lt; 5 unidades</td>
+<td>Generar lista de compras</td>
+</tr>
+</tbody>
+</table>
+<h2>8. Exportacion a Office (Mejorado)</h2>
+<ul>
+<li>Exporta datos tabulares desde contexto guardado (no solo texto)</li>
+<li>PowerPoint acepta datos tabulares (antes solo recetas)</li>
+<li>Limpieza de Markdown antes de enviar a Word (formato profesional)</li>
+<li>Contexto guardado automaticamente en cada respuesta</li>
+<li>Deteccion automatica de tipo: Merma, Menu, Personal, Documento, etc.</li>
+</ul>
+<h2>9. GUI - Sidebar</h2>
+<table>
+<thead>
+<tr>
+<th>Boton</th>
+<th>Funcion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chat</td>
+<td>Panel principal</td>
+</tr>
+<tr>
+<td>Telemetria</td>
+<td>Dashboard de uso</td>
+</tr>
+<tr>
+<td>Configuracion</td>
+<td>API Keys</td>
+</tr>
+<tr>
+<td>Limpiar chat</td>
+<td>Resetea historial y contexto</td>
+</tr>
+<tr>
+<td>Documentacion</td>
+<td>Genera Word + HTML desde resumen.md</td>
+</tr>
+<tr>
+<td>Tema</td>
+<td>Claro/Oscuro</td>
+</tr>
+</tbody>
+</table>
+<h3>9.1 Selector de Agente</h3>
+<p>Barra dedicada "Agente:" entre el chat y el input. Opciones: Auto, Recetas, Inventario, Menu, Mermas, Documentos.</p>
+<h2>10. Prompts en Ingles (Optimizacion)</h2>
+<p>Todos los prompts del sistema estan en ingles para ahorrar ~28% de tokens. Cada prompt termina con <code>ALWAYS respond in Spanish.</code></p>
+<table>
+<thead>
+<tr>
+<th>Prompt</th>
+<th>Tokens (antes)</th>
+<th>Tokens (ahora)</th>
+<th>Ahorro</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RecipeAgent</td>
+<td>~120</td>
+<td>~85</td>
+<td>-29%</td>
+</tr>
+<tr>
+<td>InventoryAgent</td>
+<td>~90</td>
+<td>~65</td>
+<td>-28%</td>
+</tr>
+<tr>
+<td>MenuAgent</td>
+<td>~140</td>
+<td>~100</td>
+<td>-29%</td>
+</tr>
+<tr>
+<td>WasteAgent</td>
+<td>~130</td>
+<td>~95</td>
+<td>-27%</td>
+</tr>
+<tr>
+<td>DocumentAgent</td>
+<td>~150</td>
+<td>~115</td>
+<td>-23%</td>
+</tr>
+<tr>
+<td>Orchestrator</td>
+<td>~250</td>
+<td>~180</td>
+<td>-28%</td>
+</tr>
+</tbody>
+</table>
+<h2>11. Documentacion Automatizada</h2>
+<p><code>documentacion.py</code> - Genera desde <code>resumen.md</code>:
+- <strong>Word</strong> <code>.docx</code> (42 KB) - Portada profesional, encabezados, tablas, codigo con fondo oscuro
+- <strong>HTML</strong> <code>.html</code> (44 KB) - Abre en navegador, Ctrl+P → guardar como PDF
+- Sin dependencias externas (python-docx puro, sin WeasyPrint/GTK)
+- Accesible desde el boton en la sidebar</p>
+<h2>12. Pruebas</h2>
+<h3>Suite de Tests (38 tests)</h3>
+<table>
+<thead>
+<tr>
+<th>Modulo</th>
+<th>Tests</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Guardrails</td>
+<td>10</td>
+</tr>
+<tr>
+<td>Ollama Provider</td>
+<td>4</td>
+</tr>
+<tr>
+<td>DSPy Optimizer</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Multiagent</td>
+<td>13</td>
+</tr>
+<tr>
+<td>Integracion</td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/<span class="w"> </span>-v
+</code></pre></div>
+
+<h2>13. Comandos Utiles</h2>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>main.py<span class="w">                           </span><span class="c1"># Iniciar aplicacion</span>
+python<span class="w"> </span>documentacion.py<span class="w">                  </span><span class="c1"># Generar documentacion Word + HTML</span>
+python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/<span class="w"> </span>-v<span class="w">               </span><span class="c1"># Ejecutar tests</span>
+</code></pre></div>
+
+<hr />
+<p><em>Ultima actualizacion: Mayo 2026</em>
+<em>Version: ChefChat Pro v2.0</em></p>
+</body>
+</html>

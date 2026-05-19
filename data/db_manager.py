@@ -145,7 +145,11 @@ class DatabaseManager:
             """)
             
             cursor.execute("""
-                CREATE VIEW IF NOT EXISTS Vista_Caducidad AS
+                DROP VIEW IF EXISTS Vista_Caducidad
+            """)
+            
+            cursor.execute("""
+                CREATE VIEW Vista_Caducidad AS
                 SELECT 
                     i.id as inventario_id,
                     c.nombre as producto_nombre,
@@ -154,8 +158,8 @@ class DatabaseManager:
                     i.cantidad_actual,
                     i.unidad,
                     c.vida_util_dias,
-                    date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days') as fecha_caducidad_efectiva,
-                    CAST(julianday(date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) - julianday(date('now')) AS INTEGER) as dias_restantes
+                    COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) as fecha_caducidad_efectiva,
+                    CAST(julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday(date('now')) AS INTEGER) as dias_restantes
                 FROM Inventario i
                 JOIN Catalogo c ON i.producto_id = c.id
                 WHERE i.cantidad_actual > 0
@@ -283,6 +287,22 @@ class DatabaseManager:
                     dias_descanso TEXT
                 )
             """)
+            
+            # Extension de columnas para gestion de personal (v2.0)
+            nuevas_columnas_personal = [
+                "ALTER TABLE Trabajadores ADD COLUMN tipo_contrato TEXT DEFAULT 'fijo'",
+                "ALTER TABLE Trabajadores ADD COLUMN estado TEXT DEFAULT 'activo'",
+                "ALTER TABLE Trabajadores ADD COLUMN fecha_inicio_contrato DATE",
+                "ALTER TABLE Trabajadores ADD COLUMN fecha_fin_contrato DATE",
+                "ALTER TABLE Trabajadores ADD COLUMN fecha_inicio_ausencia DATE",
+                "ALTER TABLE Trabajadores ADD COLUMN fecha_fin_ausencia DATE",
+                "ALTER TABLE Trabajadores ADD COLUMN motivo_ausencia TEXT",
+            ]
+            for col_sql in nuevas_columnas_personal:
+                try:
+                    cursor.execute(col_sql)
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS SobrantesReutilizables (
@@ -333,6 +353,26 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("INSERT INTO Mermas (producto, cantidad, unidad, motivo, costo_estimado, receta_asociada) VALUES (?, ?, ?, ?, ?, ?)", (producto.strip().title(), cantidad, unidad, motivo.strip(), costo_estimado, receta_asociada))
             return cursor.lastrowid
+
+    def dar_de_baja_inventario(self, producto: str, cantidad: float, unidad: str, motivo: str, costo: float = 0.0) -> str:
+        """Da de baja producto del inventario (rotura, dano, extravio)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, cantidad_actual FROM Inventario WHERE LOWER(producto_id) IN (SELECT id FROM Catalogo WHERE LOWER(nombre) = LOWER(?)) AND cantidad_actual > 0 ORDER BY fecha_ingreso ASC LIMIT 1", (producto,))
+            inv = cursor.fetchone()
+            if not inv:
+                return f"Producto '{producto}' no encontrado en inventario activo."
+            inv_id, actual = inv
+            if cantidad > actual:
+                return f"Cantidad a dar de baja ({cantidad}) excede stock actual ({actual})."
+            nueva_cant = actual - cantidad
+            if nueva_cant <= 0.001:
+                cursor.execute("DELETE FROM Inventario WHERE id = ?", (inv_id,))
+            else:
+                cursor.execute("UPDATE Inventario SET cantidad_actual = ? WHERE id = ?", (round(nueva_cant, 3), inv_id))
+            cursor.execute("INSERT INTO Mermas (producto, cantidad, unidad, motivo, costo_estimado) VALUES (?, ?, ?, ?, ?)",
+                          (producto.strip().title(), cantidad, unidad, f"BAJA: {motivo}", costo))
+            return f"BAJA registrada: {cantidad} {unidad} de {producto} - {motivo} (stock restante: {nueva_cant:.1f} {unidad})"
 
     def obtener_mermas(self, dias: int = 7) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
@@ -1061,15 +1101,19 @@ class DatabaseManager:
 
     def registrar_trabajador(self, id_empleado: str, nombre: str, cargo: str,
                              turno: str, hora_entrada: str, hora_salida: str,
-                             dias_descanso: str = "") -> str:
+                             dias_descanso: str = "",
+                             tipo_contrato: str = "fijo", estado: str = "activo",
+                             fecha_inicio: str = "", fecha_fin: str = "") -> str:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO Trabajadores
-                (id_empleado, nombre_completo, cargo, turno, hora_entrada, hora_salida, dias_descanso)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (id_empleado, nombre_completo, cargo, turno, hora_entrada, hora_salida, dias_descanso,
+                 tipo_contrato, estado, fecha_inicio_contrato, fecha_fin_contrato)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (id_empleado.upper(), nombre.strip().title(), cargo.strip().title(),
-                  turno.strip().lower(), hora_entrada, hora_salida, dias_descanso))
+                  turno.strip().lower(), hora_entrada, hora_salida, dias_descanso,
+                  tipo_contrato, estado, fecha_inicio, fecha_fin))
             return f"Trabajador {nombre} registrado (ID: {id_empleado.upper()})"
 
     def obtener_trabajadores(self, turno: str = "") -> List[Dict[str, Any]]:
@@ -1086,6 +1130,209 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM Trabajadores WHERE id_empleado = ?", (id_empleado.upper(),))
             return cursor.rowcount > 0
+
+    def registrar_ausencia(self, id_empleado: str, tipo: str,
+                           fecha_inicio: str, fecha_fin: str, motivo: str = "") -> str:
+        """Registra ausencia (reposo_medico, permiso_maternidad, vacaciones, etc.)."""
+        tipos_validos = {'reposo_medico', 'permiso_maternidad', 'vacaciones',
+                         'permiso_personal', 'suspendido'}
+        tipo_normalizado = tipo.strip().lower().replace(' ', '_')
+        if tipo_normalizado not in tipos_validos:
+            tipo_normalizado = 'permiso_personal'
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Trabajadores
+                SET estado = ?, fecha_inicio_ausencia = ?, fecha_fin_ausencia = ?,
+                    motivo_ausencia = ?
+                WHERE id_empleado = ?
+            """, (tipo_normalizado, fecha_inicio, fecha_fin, motivo, id_empleado.upper()))
+            if cursor.rowcount == 0:
+                return f"Error: Trabajador {id_empleado} no encontrado"
+            return f"Ausencia registrada: {id_empleado} - {tipo_normalizado} ({fecha_inicio} a {fecha_fin})"
+
+    def reincorporar_trabajador(self, id_empleado: str) -> str:
+        """Reincorpora a un trabajador tras una ausencia."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Trabajadores
+                SET estado = 'activo', fecha_inicio_ausencia = NULL,
+                    fecha_fin_ausencia = NULL, motivo_ausencia = NULL
+                WHERE id_empleado = ?
+            """, (id_empleado.upper(),))
+            if cursor.rowcount == 0:
+                return f"Error: Trabajador {id_empleado} no encontrado"
+            return f"Trabajador {id_empleado} reincorporado"
+
+    def obtener_personal_activo(self) -> List[Dict[str, Any]]:
+        """Obtiene personal actualmente activo (no ausente)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM Trabajadores
+                WHERE estado = 'activo'
+                ORDER BY turno, nombre_completo
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def obtener_turno_hoy(self, turno: str = "") -> List[Dict[str, Any]]:
+        """
+        Obtiene personal que trabaja hoy en un turno especifico.
+        Usa la fecha actual para determinar si el trabajador esta activo.
+        """
+        from datetime import date
+        hoy = date.today().strftime('%Y-%m-%d')
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if turno:
+                cursor.execute("""
+                    SELECT * FROM Trabajadores
+                    WHERE turno = ? AND estado = 'activo'
+                      AND (fecha_inicio_ausencia IS NULL OR fecha_inicio_ausencia > ?)
+                    ORDER BY nombre_completo
+                """, (turno.strip().lower(), hoy))
+            else:
+                cursor.execute("""
+                    SELECT * FROM Trabajadores
+                    WHERE estado = 'activo'
+                      AND (fecha_inicio_ausencia IS NULL OR fecha_inicio_ausencia > ?)
+                    ORDER BY turno, nombre_completo
+                """, (hoy,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def obtener_personal_con_ausencia(self) -> List[Dict[str, Any]]:
+        """Obtiene personal actualmente ausente."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM Trabajadores
+                WHERE estado != 'activo'
+                ORDER BY fecha_inicio_ausencia DESC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def seed_mermas_realistas(self, dias: int = 30) -> str:
+        """
+        Genera datos realistas de mermas para un restaurante.
+        Incluye desperdicio diario de vegetales, sobreproduccion,
+        pan, aceite, y accidentes varios.
+        """
+        import random
+        from datetime import date, timedelta
+
+        productos_vegetales = [
+            ("Cebolla", 0.3, 1.5, "kg", 1.20),
+            ("Tomate", 0.5, 2.0, "kg", 1.80),
+            ("Lechuga", 0.2, 1.0, "kg", 2.50),
+            ("Zanahoria", 0.2, 0.8, "kg", 1.00),
+            ("Pimiento", 0.2, 0.5, "kg", 2.00),
+            ("Papa", 0.3, 2.0, "kg", 0.80),
+            ("Aguacate", 0.1, 0.3, "kg", 3.50),
+            ("Cilantro", 0.05, 0.15, "kg", 5.00),
+            ("Ajo", 0.05, 0.1, "kg", 4.00),
+            ("Espinaca", 0.2, 0.5, "kg", 3.00),
+        ]
+        productos_proteinas = [
+            ("Pollo", 0.5, 2.0, "kg", 4.50),
+            ("Cerdo", 0.3, 1.5, "kg", 5.00),
+            ("Pescado", 0.2, 1.0, "kg", 7.00),
+            ("Res", 0.3, 1.0, "kg", 8.00),
+        ]
+        productos_pan = [
+            ("Pan bolillo", 1.0, 3.0, "kg", 1.50),
+            ("Pan de caja", 0.5, 1.5, "kg", 2.00),
+        ]
+        sobreproduccion = [
+            ("Sopa del dia", 1, 4, "porciones", 8.00),
+            ("Arroz", 0.5, 2.0, "kg", 1.20),
+            ("Frijoles", 0.3, 1.5, "kg", 1.50),
+            ("Guarnicion", 1, 5, "porciones", 6.00),
+            ("Postre del dia", 1, 3, "porciones", 10.00),
+        ]
+        motivos_vegetal = [
+            "Se echo a perder", "Sobre-maduracion", "Golpeado",
+            "No paso control de calidad", "Oxidacion"
+        ]
+        motivos_proteina = [
+            "Caduco", "Cambio de color", "Mal olor",
+            "Descongelacion inadecuada", "Excedio vida util"
+        ]
+        motivos_sobreprod = [
+            "Sobreproduccion", "No se vendio", "Excedente de buffet",
+            "Error de calculo en porciones"
+        ]
+        motivos_accidente = [
+            "Se cayo al piso", "Se quemo en coccion",
+            "Contaminacion cruzada", "Error de preparacion"
+        ]
+
+        registros = 0
+        hoy = date.today()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            for d in range(dias, -1, -1):
+                fecha = hoy - timedelta(days=d)
+
+                # 1. Desperdicio de vegetales (diario, 2-5 items)
+                random.shuffle(productos_vegetales)
+                for prod in productos_vegetales[:random.randint(2, 5)]:
+                    cant = round(random.uniform(prod[1], prod[2]), 2)
+                    motivo = random.choice(motivos_vegetal)
+                    costo = round(cant * prod[4], 2)
+                    cursor.execute(
+                        "INSERT INTO Mermas (fecha, producto, cantidad, unidad, motivo, costo_estimado) VALUES (?,?,?,?,?,?)",
+                        (fecha.strftime('%Y-%m-%d'), prod[0], cant, prod[3], motivo, costo))
+                    registros += 1
+
+                # 2. Desperdicio de proteinas (cada 2-3 dias)
+                if d % random.randint(2, 3) == 0:
+                    prod = random.choice(productos_proteinas)
+                    cant = round(random.uniform(prod[1], prod[2]), 2)
+                    motivo = random.choice(motivos_proteina)
+                    costo = round(cant * prod[4], 2)
+                    cursor.execute(
+                        "INSERT INTO Mermas (fecha, producto, cantidad, unidad, motivo, costo_estimado) VALUES (?,?,?,?,?,?)",
+                        (fecha.strftime('%Y-%m-%d'), prod[0], cant, prod[3], motivo, costo))
+                    registros += 1
+
+                # 3. Pan (diario, casi siempre)
+                if random.random() > 0.2:
+                    prod = random.choice(productos_pan)
+                    cant = round(random.uniform(prod[1], prod[2]), 2)
+                    costo = round(cant * prod[4], 2)
+                    cursor.execute(
+                        "INSERT INTO Mermas (fecha, producto, cantidad, unidad, motivo, costo_estimado) VALUES (?,?,?,?,?,?)",
+                        (fecha.strftime('%Y-%m-%d'), prod[0], cant, prod[3],
+                         "Sobrante del dia", costo))
+                    registros += 1
+
+                # 4. Sobreproduccion (cada 2-4 dias)
+                if d % random.randint(2, 4) == 0:
+                    prod = random.choice(sobreproduccion)
+                    cant = round(random.uniform(prod[1], prod[2]), 2)
+                    motivo = random.choice(motivos_sobreprod)
+                    costo = round(cant * (prod[4] / max(prod[2], 1)), 2)
+                    cursor.execute(
+                        "INSERT INTO Mermas (fecha, producto, cantidad, unidad, motivo, costo_estimado) VALUES (?,?,?,?,?,?)",
+                        (fecha.strftime('%Y-%m-%d'), prod[0], cant, prod[3], motivo, costo))
+                    registros += 1
+
+                # 5. Accidentes (ocasional, ~1 por semana)
+                if d % 7 == random.randint(0, 6):
+                    prods_acc = ["Salsa roja", "Crema", "Huevo", "Queso", "Arroz",
+                                 "Pollo empanizado", "Filete de pescado"]
+                    prod = random.choice(prods_acc)
+                    cant = round(random.uniform(0.2, 1.5), 2)
+                    motivo = random.choice(motivos_accidente)
+                    costo = round(cant * random.uniform(2, 8), 2)
+                    cursor.execute(
+                        "INSERT INTO Mermas (fecha, producto, cantidad, unidad, motivo, costo_estimado) VALUES (?,?,?,?,?,?)",
+                        (fecha.strftime('%Y-%m-%d'), prod, cant, "kg", motivo, costo))
+                    registros += 1
+
+        return f"Mermas generadas: {registros} registros en {dias + 1} dias (hasta {hoy.strftime('%Y-%m-%d')})"
 
     # =========================================================================
     # SOBRANTES REUTILIZABLES

@@ -8,6 +8,12 @@ from core.config import AIProvider, ConfigManager
 from core.models import AccionOffice
 from langchain_anthropic import ChatAnthropic
 
+# Import AlertManager for cross-agent alerts
+try:
+    from agents.alertas import AlertManager
+except ImportError:
+    AlertManager = None  # type: ignore
+
 # Contexto global para exportar datos a Office
 _ultimo_contexto_exportacion: Dict[str, Any] = {
     "datos": None,  # Lista de listas con los datos
@@ -21,12 +27,9 @@ def obtener_contexto_exportacion() -> Dict[str, Any]:
 
 def guardar_contexto_exportacion(datos: List[List], columnas: Optional[List[str]] = None, titulo: str = "") -> None:
     """Guarda datos en el contexto para posterior exportación."""
-    global _ultimo_contexto_exportacion
-    _ultimo_contexto_exportacion = {
-        "datos": datos,
-        "columnas": columnas,
-        "titulo": titulo,
-    }
+    _ultimo_contexto_exportacion["datos"] = datos
+    _ultimo_contexto_exportacion["columnas"] = columnas
+    _ultimo_contexto_exportacion["titulo"] = titulo
 
 
 PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
@@ -62,7 +65,9 @@ PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
 
 HERRAMIENTAS_DETECTABLES = {
     "registrar_merma": {
-        "patrones": ["registrar_merma", "registra merma", "registre merma"],
+        "patrones": ["registrar_merma", "registra merma", "registre merma",
+                     "de merma", "en merma", "como merma", "merma de",
+                     "reporto merma", "reportar merma", "anotar merma"],
         "descripcion": "Input: 'producto, cantidad, unidad, motivo, costo(opcional)'"
     },
     "reporte_mermas": {
@@ -161,6 +166,42 @@ HERRAMIENTAS_DETECTABLES = {
         "patrones": ["buscar_recetas_con_ingrediente", "recetas con", "receta con", "buscar recetas con ingrediente", "busca recetas con"],
         "descripcion": "Input: ingrediente (str)"
     },
+    "consultar_turno_hoy": {
+        "patrones": ["consultar_turno_hoy", "turno de hoy", "quien trabaja hoy", "personal de hoy",
+                     "turno hoy", "quien esta de turno", "personal turno"],
+        "descripcion": "Input: turno (str, opcional)"
+    },
+    "consultar_personal_activo": {
+        "patrones": ["consultar_personal_activo", "personal activo", "trabajadores activos",
+                     "quien esta activo", "empleados activos"],
+        "descripcion": "Sin input"
+    },
+    "consultar_personal_ausente": {
+        "patrones": ["consultar_personal_ausente", "personal ausente", "trabajadores ausentes",
+                     "quien falta", "empleados con permiso", "reposo", "maternidad", "incapacidad"],
+        "descripcion": "Sin input"
+    },
+    "registrar_ausencia": {
+        "patrones": ["registrar_ausencia", "registra ausencia", "dar de baja", "incapacidad",
+                     "reposo medico", "permiso maternidad", "reportar ausencia"],
+        "descripcion": "Input: 'id_empleado, tipo, fecha_inicio, fecha_fin, motivo'"
+    },
+    "seed_mermas": {
+        "patrones": ["seed_mermas", "generar mermas", "crear mermas", "poblar mermas",
+                     "llenar mermas", "mermas realistas", "simular mermas"],
+        "descripcion": "Input: dias (int, opcional, default 30)"
+    },
+    "registrar_compra": {
+        "patrones": ["registrar_compra", "se compro", "se compró", "compre", "compré",
+                     "ingresa compra", "registra compra", "agrega compra", "añadir compra"],
+        "descripcion": "Input: lenguaje natural. Ej: 'se compro 3 kintales de harina caduca 12-03-2027'"
+    },
+    "registrar_permiso_rapido": {
+        "patrones": ["registrar_permiso", "saco permiso", "sacó permiso", "pidio permiso",
+                     "pidió permiso", "tiene permiso", "de permiso", "reposo", "paternidad",
+                     "maternidad", "incapacidad", "esta de baja", "está de baja"],
+        "descripcion": "Input: lenguaje natural. Ej: 'juan saco permiso por paternidad 6 dias'"
+    },
 }
 
 
@@ -172,35 +213,37 @@ class Orchestrator:
     """
 
     RAG_ONLY_SYSTEM_PROMPT = """
-Eres ChefChat Pro, un asistente profesional de restaurantes.
+You are ChefChat Pro, a professional restaurant assistant.
 
-REGLAS CRÍTICAS:
-1. SOLO utiliza la base de datos SQLite local para recetas.
-2. NUNCA inventes recetas. Si no está en la BD, di "No encontrado en el sistema".
-3. Para buscar recetas, usa buscar_receta(nombre_o_id).
-4. Para buscar recetas por ingrediente, usa buscar_recetas_con_ingrediente(ingrediente).
-5. Para inventario, usa productos_por_caducar(dias) o verificar_stock_bajo().
-6. Para escalar recetas, usa escalar_receta(receta_id, comensales).
-7. Para reportar problemas, usa registrar_incidencia(categoria, descripcion).
-8. Para menu semanal, usa consultar_menu_semanal(pregunta).
-9. Para agregar plato al menu, usa agregar_plato_menu(dia, servicio, nombre, precio, prep).
-10. Para agregar receta de RAG al menu, usa agregar_receta_al_menu(dia, servicio, receta_id, precio).
-11. Para buscar documentos, usa buscar_documento(termino).
-12. Para mermas, usa reporte_mermas(dias).
-13. Para exportar a Word/Excel/PowerPoint, di "a excel", "a word", "a powerpoint".
-14. Para menu anti-desperdicio, usa menu_anti_desperdicio().
-15. Para lista de compras, usa generar_lista_compras(recetas_csv, comensales).
+CRITICAL RULES:
+1. ONLY use the local SQLite database for recipes.
+2. NEVER invent recipes. If not in DB, say "Not found in the system."
+3. To search recipes, use buscar_receta(nombre_o_id).
+4. To search recipes by ingredient, use buscar_recetas_con_ingrediente(ingrediente).
+5. For inventory, use productos_por_caducar(dias) or verificar_stock_bajo().
+6. To scale recipes, use escalar_receta(receta_id, comensales).
+7. To report issues, use registrar_incidencia(categoria, descripcion).
+8. For weekly menu, use consultar_menu_semanal(pregunta).
+9. To add dish to menu, use agregar_plato_menu(dia, servicio, nombre, precio, prep).
+10. To add RAG recipe to menu, use agregar_receta_al_menu(dia, servicio, receta_id, precio).
+11. To search documents, use buscar_documento(termino).
+12. For waste, use reporte_mermas(dias).
+13. To export to Word/Excel/PowerPoint, say "a excel", "a word", "a powerpoint".
+14. For anti-waste menu, use menu_anti_desperdicio().
+15. For shopping list, use generar_lista_compras(recetas_csv, comensales).
 
-FLUJO DE DETECCIÓN:
-- "menu semanal", "menu del dia" → consultar_menu_semanal()
-- "busca documento", "capacitacion", "protocolo" → buscar_documento()
-- "receta PLF-018" → buscar_receta("PLF-018")
-- "receta con pollo" → buscar_recetas_con_ingrediente("pollo")
-- "merma" → reporte_mermas(dias)
-- "sugiere menu con pollo, arroz" → sugerir_menu_por_ingredientes("pollo, arroz")
-- "a excel" / "a word" / "a powerpoint" → exportar ultimo contexto
+DETECTION FLOW:
+- "menu semanal", "menu del dia" -> consultar_menu_semanal()
+- "busca documento", "capacitacion", "protocolo" -> buscar_documento()
+- "receta PLF-018" -> buscar_receta("PLF-018")
+- "receta con pollo" -> buscar_recetas_con_ingrediente("pollo")
+- "merma" -> reporte_mermas(dias)
+- "sugiere menu con pollo, arroz" -> sugerir_menu_por_ingredientes("pollo, arroz")
+- "a excel" / "a word" / "a powerpoint" -> export last context
 
-Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para cargar nuevos documentos.
+If user requests a recipe not found, suggest using the [+] button to load new documents.
+
+ALWAYS respond in Spanish.
 """
 
     def __init__(
@@ -210,12 +253,21 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         streaming_callback: Optional[Callable[[str], None]] = None,
         rag_only: bool = True,
         db_manager=None,  # For telemetry logging
+        forced_agent_role: Optional[str] = None,  # "recipe", "inventory", "menu", "waste", "document"
+        mostrar_alertas: bool = True,  # Si es False, no muestra alertas cruzadas
     ) -> None:
         self.provider = provider or ConfigManager.get_configured_provider() or AIProvider.OPENAI
+        self.forced_agent_role = forced_agent_role
+        self._mostrar_alertas = mostrar_alertas
         
         # CRITICAL DEBUG LOG
         import logging
-        logging.critical(f"ORCHESTRATOR INIT - provider param: {provider}, ConfigManager.get_configured_provider: {ConfigManager.get_configured_provider()}, final self.provider: {self.provider}")
+        logging.critical(
+            "ORCHESTRATOR INIT - provider param: %s, ConfigManager.get_configured_provider: %s, final self.provider: %s",
+            provider,
+            ConfigManager.get_configured_provider(),
+            self.provider,
+        )
         
         self.api_key = ConfigManager.get_api_key(self.provider)
         
@@ -224,7 +276,7 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
             self.api_key = self.api_key or "ollama"
         
         # Debug logging
-        logging.info(f"Orchestrator init - Provider: {self.provider}, API Key found: {bool(self.api_key)}")
+        logging.info("Orchestrator init - Provider: %s, API Key found: %s", self.provider, bool(self.api_key))
         
         if not self.api_key:
             # Try to get all providers to see what's available
@@ -285,7 +337,11 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 ) from exc
             
             # CRITICAL DEBUG: Log api_key and base_url before creating client
-            logging.critical(f"Creating OpenAI client - api_key length: {len(self.api_key) if self.api_key else 0}, base_url: {self.base_url}")
+            logging.critical(
+                "Creating OpenAI client - api_key length: %d, base_url: %s",
+                len(self.api_key) if self.api_key else 0,
+                self.base_url,
+            )
             
             client_kwargs: Dict[str, Any] = {"api_key": self.api_key}
             if self.base_url:
@@ -297,21 +353,25 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 except ImportError:
                     client_kwargs["base_url"] = self.base_url
             
-            logging.critical(f"client_kwargs: api_key={len(self.api_key) if self.api_key else 0} chars, base_url={client_kwargs.get('base_url')}")
+            logging.critical(
+                "client_kwargs: api_key=%d chars, base_url=%s",
+                len(self.api_key) if self.api_key else 0,
+                client_kwargs.get('base_url'),
+            )
             
             client = OpenAI(**client_kwargs)
             
-            logging.critical(f"Client created: {client}")
-            logging.critical(f"Client base_url: {client.base_url}")
+            logging.critical("Client created: %s", client)
+            logging.critical("Client base_url: %s", client.base_url)
 
             self.llm = ChatOpenAI(
-                model_name=self.model_name,
+                model=self.model_name,
                 api_key=self.api_key,  # Pass api_key directly to ChatOpenAI
                 base_url=self.base_url if self.base_url else None,  # Pass base_url directly
                 temperature=0.7,
             )
             
-            logging.critical(f"ChatOpenAI created successfully: {self.llm}")
+            logging.critical("ChatOpenAI created successfully: %s", self.llm)
 
     def _setup_tools(self) -> None:
         from agents.tools import crear_herramientas_operativas
@@ -331,15 +391,112 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         )
 
     def _setup_multiagent(self) -> None:
-        """Inicializa el sistema multiagente."""
+        """Inicializa el sistema multiagente con el LLM compartido."""
         import logging
         try:
             from agents.multiagent import MultiAgentSystem
-            self.multiagent = MultiAgentSystem(self.tools)
-            logging.info("MultiAgent system initialized successfully")
+            self.multiagent = MultiAgentSystem(self.tools, self.llm)
+            logging.info("MultiAgent system initialized successfully with LLM")
         except Exception as e:
-            logging.warning(f"Could not initialize MultiAgent system: {e}")
+            logging.warning("Could not initialize MultiAgent system: %s", e)
             self.multiagent = None
+
+    def _save_export_context(self, respuesta: str) -> None:
+        """Guarda el contexto para exportacion a Office."""
+        try:
+            from agents.orchestrator import guardar_contexto_exportacion
+            lineas = respuesta.split("\n") if respuesta else []
+            guardar_contexto_exportacion(
+                datos=[[l] for l in lineas if l.strip()],
+                columnas=["Contenido"],
+                titulo=(respuesta.split("\n")[0][:80] if respuesta else "ChefChat Pro")
+            )
+        except Exception:
+            pass
+
+    def _route_to_forced_agent(self, historial: List[Dict[str, str]]) -> Optional[str]:
+        """
+        Envía la consulta directamente al agente seleccionado en la GUI.
+        
+        Args:
+            historial: Lista de mensajes del chat.
+            
+        Returns:
+            str con la respuesta del agente, o None si falla.
+        """
+        import logging
+        if not self.forced_agent_role or not self.multiagent:
+            return None
+        
+        ultimo_mensaje = historial[-1]["contenido"] if historial else ""
+        if not ultimo_mensaje.strip():
+            return None
+        
+        from agents.multiagent import AgentRole, AgentTask
+        
+        role_map = {
+            "recipe": AgentRole.RECIPE,
+            "inventory": AgentRole.INVENTORY,
+            "menu": AgentRole.MENU,
+            "waste": AgentRole.WASTE,
+            "document": AgentRole.DOCUMENT,
+        }
+        
+        role = role_map.get(self.forced_agent_role)
+        if role is None:
+            logging.warning(f"Unknown forced agent role: {self.forced_agent_role}")
+            return None
+        
+        agent = self.multiagent.agents.get(role)
+        if agent is None:
+            logging.warning(f"Agent not found for role: {role.value}")
+            return None
+        
+        logging.info(f"[ForcedAgent] Routing to {role.value}: {ultimo_mensaje[:80]}...")
+        
+        task = AgentTask(role=role, query=ultimo_mensaje, priority=10)
+        result_task = agent.execute(task)
+        
+        if result_task.success and result_task.result:
+            return result_task.result
+        elif result_task.result:
+            return result_task.result
+        else:
+            return f"[{role.value}] No se pudo procesar la consulta."
+
+    def _inject_alerts(self, respuesta: str, historial: List[Dict[str, str]]) -> str:
+        """
+        Inyecta alertas cruzadas del sistema al final de cada respuesta.
+        Solo se muestran en la primera respuesta de la sesion.
+        """
+        if not self._mostrar_alertas:
+            return respuesta
+        
+        if not AlertManager or not self.db_manager:
+            return respuesta
+        
+        try:
+            ultimo_mensaje = historial[-1]["contenido"].lower() if historial else ""
+            
+            # Detectar tipo de consulta
+            query_type = "general"
+            if any(k in ultimo_mensaje for k in ['receta', 'menu', 'menú', 'cocinar', 'preparar', 'ingrediente']):
+                query_type = "receta"
+            elif any(k in ultimo_mensaje for k in ['inventario', 'stock', 'caducar', 'producto', 'compra']):
+                query_type = "inventario"
+            elif any(k in ultimo_mensaje for k in ['merma', 'desperdicio', 'sobrante']):
+                query_type = "mermas"
+            
+            alert_manager = AlertManager(self.db_manager)
+            alertas = alert_manager.get_all_alerts(ultimo_mensaje, query_type)
+            
+            if alertas:
+                return respuesta + "\n" + alertas
+            
+        except Exception as e:
+            logging.warning(f"Alert injection error: {e}")
+        
+        return respuesta
 
     def generar_respuesta(
         self, historial: List[Dict[str, str]], contexto_rag: Optional[str] = None
@@ -370,6 +527,16 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         respuesta = ""
         
         try:
+            # ============================================================
+            # FORCED AGENT ROUTING: Si el usuario seleccionó un agente
+            # específico en la GUI, usarlo directamente.
+            # ============================================================
+            if self.forced_agent_role:
+                respuesta = self._route_to_forced_agent(historial)
+                if respuesta:
+                    self._save_export_context(respuesta)
+                    return self._inject_alerts(respuesta, historial)
+
             # Intentar usar herramientas manualmente para búsquedas de recetas
             ultimo_mensaje = historial[-1]["contenido"].lower() if historial else ""
             
@@ -454,6 +621,8 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
             # ============================================================
             # PRIORIDAD 3: BUSCAR DOCUMENTOS (ANTES de buscar recetas)
             # ============================================================
+            # PRIORIDAD 3: BUSCAR DOCUMENTOS (ANTES de buscar recetas)
+            # ============================================================
             if not respuesta and self.db_manager and any(p in ultimo_mensaje for p in ["busca documento", "buscar documento", "documento", "capacitacion", "capacitación", "buenas practicas", "buenas prácticas", "protocolo", "protocolos", "manual"]):
                 from data.rag_store import RAGStore
                 rag = RAGStore()
@@ -480,9 +649,7 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                     for palabra in palabras:
                         if len(palabra) > 3:
                             docs = rag.buscar_documento(palabra)
-                            if docs:
-                                break
-                
+
                 # Si no encontro, buscar por tipo de documento
                 if not docs:
                     if any(p in ultimo_mensaje for p in ["protocolo", "protocolos", "manual", "bpm", "buenas practicas"]):
@@ -492,12 +659,46 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 
                 if docs:
                     lineas = [f"DOCUMENTOS ENCONTRADOS ({len(docs)}):"]
+                    contenido_total = []
                     for d in docs[:10]:
-                        lineas.append(f"  - {d.get('nombre')} (tipo: {d.get('tipo')})")
+                        nombre = d.get('nombre', 'Sin nombre')
+                        tipo = d.get('tipo', 'general')
+                        contenido = d.get('contenido_completo') or d.get('contenido_preview') or d.get('contenido', '')
+                        lineas.append(f"  - {nombre} (tipo: {tipo})")
+                        if contenido:
+                            lineas.append("")
+                            lineas.append(contenido[:3000])
+                            lineas.append("")
+                            contenido_total.append(f"# {nombre}\n\n{contenido}")
                     respuesta = "\n".join(lineas)
+                    
+                    # Guardar contexto para exportacion a Office
+                    from agents.orchestrator import guardar_contexto_exportacion
+                    if contenido_total:
+                        guardar_contexto_exportacion(
+                            datos=[[c] for c in contenido_total],
+                            columnas=["Documento"],
+                            titulo=f"Documentos: {termino}"
+                        )
                     logging.critical(f"DOCUMENTOS: {respuesta[:100]}")
                 else:
                     respuesta = f"No se encontraron documentos con: {termino}. Usa el boton [+] para cargar documentos."
+
+            # ============================================================
+            # PRIORIDAD 3.5: CONSULTAS DE PERSONAL
+            # ============================================================
+            if not respuesta and self.multiagent and any(p in ultimo_mensaje for p in
+                ["empleado", "empleados", "trabajador", "trabajadores", "personal",
+                 "turno de hoy", "quien trabaja", "quien esta", "staff", "equipo",
+                 "ausencia", "permiso", "reposo", "maternidad", "paternidad",
+                 "vacaciones", "reincorpora", "lista de empleados"]):
+                from agents.multiagent import AgentRole, AgentTask
+                doc_agent = self.multiagent.agents.get(AgentRole.DOCUMENT)
+                if doc_agent:
+                    task = AgentTask(role=AgentRole.DOCUMENT, query=ultimo_mensaje, priority=10)
+                    result_task = doc_agent.execute(task)
+                    if result_task.success and result_task.result:
+                        respuesta = result_task.result
 
             # ============================================================
             # PRIORIDAD 4: RECETA POR ID (PLF-018, SOP-021, etc.)
@@ -839,7 +1040,10 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 logging.critical(f"TELEMETRY ERROR: {e}")
                 pass
         
-        return respuesta
+        # Guardar contexto de exportacion para Office con la respuesta completa
+        self._save_export_context(respuesta)
+        
+        return self._inject_alerts(respuesta, historial)
 
     def _procesar_mensaje_con_id(
         self,

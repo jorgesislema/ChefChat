@@ -68,6 +68,64 @@ def _obtener_conexion(db: DatabaseManager):
     conn.row_factory = sqlite3.Row
     return conn
 
+# ---- Funciones auxiliares para registro de compras ----
+
+def _detectar_categoria(producto: str) -> str:
+    """Detecta la categoria de un producto por su nombre."""
+    p = producto.lower()
+    if any(k in p for k in ['carne', 'pollo', 'cerdo', 'res', 'pescado', 'camaron', 'marisco', 'huevo']):
+        return 'Proteina'
+    if any(k in p for k in ['leche', 'queso', 'crema', 'mantequilla', 'yogur', 'helado']):
+        return 'Lacteo'
+    if any(k in p for k in ['pan', 'harina', 'tortilla', 'galleta', 'pastel', 'bolillo']):
+        return 'Panaderia'
+    if any(k in p for k in ['cebolla', 'tomate', 'lechuga', 'zanahoria', 'papa', 'ajo', 'pimiento',
+                              'aguacate', 'cilantro', 'espinaca', 'brocoli', 'coliflor', 'apio',
+                              'pepino', 'calabaza', 'chile', 'jitomate', 'elote', 'chayote']):
+        return 'Vegetales'
+    if any(k in p for k in ['manzana', 'naranja', 'platano', 'fresa', 'mango', 'pina', 'piña',
+                              'sandia', 'melon', 'uva', 'limon', 'durazno', 'pera', 'guayaba']):
+        return 'Frutas'
+    if any(k in p for k in ['arroz', 'frijol', 'lenteja', 'garbanzo', 'maiz', 'maíz', 'avena',
+                              'cereal', 'pasta', 'espagueti', 'fideo', 'sopa']):
+        return 'Secos'
+    if any(k in p for k in ['aceite', 'sal', 'azucar', 'azúcar', 'vinagre', 'salsa', 'condimento',
+                              'especia', 'pimienta', 'oregano', 'comino', 'canela', 'clavo',
+                              'caldo', 'consome', 'mayonesa', 'catsup', 'mostaza', 'soya']):
+        return 'Condimentos'
+    if any(k in p for k in ['jabon', 'jabón', 'detergente', 'cloro', 'desinfectante', 'papel',
+                              'servilleta', 'bolsa', 'aluminio', 'plastico', 'plástico']):
+        return 'Limpieza'
+    if any(k in p for k in ['refresco', 'agua', 'jugo', 'cerveza', 'vino', 'licor', 'bebida']):
+        return 'Bebidas'
+    return 'General'
+
+
+def _estimar_vida_util(producto: str) -> int:
+    """Estima la vida util en dias segun el tipo de producto."""
+    p = producto.lower()
+    if any(k in p for k in ['carne', 'pollo', 'cerdo', 'res', 'pescado', 'camaron', 'marisco']):
+        return 5
+    if any(k in p for k in ['leche', 'crema', 'yogur']):
+        return 7
+    if any(k in p for k in ['queso', 'mantequilla']):
+        return 30
+    if any(k in p for k in ['pan', 'bolillo', 'tortilla']):
+        return 3
+    if any(k in p for k in ['harina', 'galleta']):
+        return 90
+    if any(k in p for k in ['cebolla', 'tomate', 'lechuga', 'espinaca', 'cilantro', 'aguacate']):
+        return 7
+    if any(k in p for k in ['papa', 'zanahoria', 'ajo', 'cebolla', 'calabaza']):
+        return 30
+    if any(k in p for k in ['arroz', 'frijol', 'lenteja', 'garbanzo', 'maiz', 'maíz', 'avena', 'pasta']):
+        return 365
+    if any(k in p for k in ['aceite', 'sal', 'azucar', 'azúcar', 'vinagre', 'condimento', 'especia']):
+        return 365
+    if any(k in p for k in ['huevo']):
+        return 21
+    return 30
+
 def _parse_ingredientes(ingredientes_json):
     """Parsea ingredientes desde JSON o desde cadenas con formato delimitado por '|'."""
     if isinstance(ingredientes_json, str) and ingredientes_json.startswith("["):
@@ -254,15 +312,16 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             conn = _obtener_conexion(db)
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT c.nombre, c.categoria, i.cantidad_actual, i.unidad, i.fecha_caducidad,
-                       CAST(julianday(i.fecha_caducidad) - julianday('now') AS INTEGER) as dias_restantes
+                SELECT c.nombre, c.categoria, i.cantidad_actual, i.unidad,
+                       COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) as fecha_caducidad,
+                       CAST(julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') AS INTEGER) as dias_restantes
                 FROM Inventario i
                 JOIN Catalogo c ON i.producto_id = c.id
                 WHERE i.cantidad_actual > 0 
-                  AND i.fecha_caducidad IS NOT NULL
-                  AND julianday(i.fecha_caducidad) - julianday('now') <= ?
-                  AND julianday(i.fecha_caducidad) - julianday('now') >= 0
-                ORDER BY i.fecha_caducidad ASC
+                  AND (i.fecha_caducidad_fija IS NOT NULL OR c.vida_util_dias IS NOT NULL)
+                  AND julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') <= ?
+                  AND julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') >= 0
+                ORDER BY COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) ASC
             """, (dias,))
             rows = cursor.fetchall()
             conn.close()
@@ -276,10 +335,41 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             if not rows:
                 return f"No hay productos por caducar en {dias} dias."
             
-            lineas = [f"CADUCAN EN {dias} DIAS:"]
+            lineas = [f"CADUCAN EN {dias} DIAS:", ""]
+            urgentes = []
             for row in rows:
                 prioridad = "[URGENTE]" if row[5] <= 1 else "[PRONTO]" if row[5] <= 3 else "[OK]"
                 lineas.append(f"{prioridad} {row[0]}: {row[2]} {row[3]} ({row[5]} dias) - {row[1]}")
+                if row[5] <= 3:
+                    urgentes.append((row[0], row[5]))
+            
+            # Sugerir recetas para productos urgentes
+            if urgentes:
+                lineas.append("")
+                lineas.append("RECETAS SUGERIDAS PARA APROVECHAR:")
+                lineas.append("-" * 40)
+                conn2 = _obtener_conexion(db)
+                cursor2 = conn2.cursor()
+                encontradas = 0
+                for nombre_prod, dias_rest in urgentes[:5]:
+                    palabra = nombre_prod.lower().split()[0]
+                    try:
+                        cursor2.execute("""
+                            SELECT nombre, categoria, tiempo_prep FROM RecetasRAG
+                            WHERE LOWER(ingredientes_json) LIKE ? LIMIT 2
+                        """, (f"%{palabra}%",))
+                        recetas = cursor2.fetchall()
+                        if recetas:
+                            lineas.append(f"  Para {nombre_prod} ({dias_rest} dias):")
+                            for r in recetas:
+                                lineas.append(f"    - {r[0]} ({r[1]}) - {r[2]} min")
+                                encontradas += 1
+                    except (sqlite3.Error, Exception):
+                        pass
+                conn2.close()
+                if encontradas == 0:
+                    lineas.append("  (No se encontraron recetas especificas. Usa [+] para cargar mas recetas)")
+            
             return "\n".join(lineas)
         except sqlite3.Error as e:
             return f"Error de base de datos: {str(e)}"
@@ -334,7 +424,8 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT c.nombre as nombre_producto, SUM(i.cantidad_actual) as cantidad_actual,
-                       i.unidad, c.vida_util_dias as dias_restantes
+                       i.unidad,
+                       CAST(MIN(julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now')) AS INTEGER) as dias_restantes
                 FROM Inventario i JOIN Catalogo c ON i.producto_id = c.id
                 WHERE i.cantidad_actual > 0
                 GROUP BY c.nombre, i.unidad
@@ -445,7 +536,7 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                     continue
                 
                 nombre_receta, ingredientes_json, porciones_base = row
-                _procesar_ingredientes_receta(cursor, nombre_receta, ingredientes_json, porciones_base, comensales, ingredientes_totales)
+                _procesar_ingredientes_receta(nombre_receta, ingredientes_json, porciones_base, comensales, ingredientes_totales)
             
             conn2 = _obtener_conexion(db)
             cursor2 = conn2.cursor()
@@ -1433,14 +1524,15 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 conn = _obtener_conexion(db)
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT c.nombre, c.categoria, i.cantidad_actual, i.unidad, i.fecha_caducidad,
-                           CAST(julianday(i.fecha_caducidad) - julianday('now') AS INTEGER) as dias_restantes
+                    SELECT c.nombre, c.categoria, i.cantidad_actual, i.unidad,
+                           COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) as fecha_caducidad,
+                           CAST(julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') AS INTEGER) as dias_restantes
                     FROM Inventario i
                     JOIN Catalogo c ON i.producto_id = c.id
                     WHERE i.cantidad_actual > 0 
-                      AND i.fecha_caducidad IS NOT NULL
-                      AND julianday(i.fecha_caducidad) - julianday('now') <= 7
-                    ORDER BY i.fecha_caducidad ASC
+                      AND (i.fecha_caducidad_fija IS NOT NULL OR c.vida_util_dias IS NOT NULL)
+                      AND julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') <= 7
+                    ORDER BY COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) ASC
                 """)
                 rows = cursor.fetchall()
                 conn.close()
@@ -1588,18 +1680,78 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 conn.close()
 
     def _registrar_merma(parametros: str) -> str:
-        """Registra merma/desperdicio. Input: 'producto, cantidad, unidad, motivo, costo_estimado(opcional)' Ej: 'cebolla, 2.5, kg, se echó a perder, 1.50'"""
+        """Registra merma/desperdicio. Input: 'producto, cantidad, unidad, motivo, costo' o lenguaje natural: '23 kilos de cerdo de merma'"""
+        try:
+            import re
+            partes = [p.strip() for p in parametros.split(",")]
+            if len(partes) >= 4:
+                producto = partes[0]
+                cantidad = float(partes[1])
+                unidad = partes[2]
+                motivo = partes[3]
+                costo = float(partes[4]) if len(partes) > 4 and partes[4] else 0.0
+            else:
+                # Parseo de lenguaje natural: "23 kilos de cerdo de merma"
+                match_nl = re.search(
+                    r'(\d+(?:[.,]\d+)?)\s*(kilos?|kg|kgs?|litros?|lts?|l\b|'
+                    r'unidades?|unds?|piezas?|pzas?|gramos?|grs?|g\b|'
+                    r'libras?|lbs?|onzas?|oz|paquetes?|bolsas?|cajas?|galones?|'
+                    r'porciones?)\s+(?:de\s+)?(.+?)(?:\s+(?:de|en|como|por)\s+merma|\s+(?:se\s+)?'
+                    r'(?:echo|echó|echo a perder|dañ[oó]|pudri[oó]|caduc[oóad]+|venci[oó]|'
+                    r'sobra|sobr[oó]|desperdici[oó]|mal\s+estado|contamin[oa]d[oa]|'
+                    r'pas[oó]\s+de\s+fecha|expirad[oa]|malogrado|inservible))',
+                    parametros, re.IGNORECASE
+                )
+                if match_nl:
+                    cantidad = float(match_nl.group(1).replace(',', '.'))
+                    unidad_raw = match_nl.group(2).lower()
+                    producto = match_nl.group(3).strip().rstrip(',').rstrip('.')
+                    unidad_map = {'kilos': 'kg', 'kilo': 'kg', 'kgs': 'kg', 'kg': 'kg',
+                                  'litros': 'L', 'litro': 'L', 'lts': 'L', 'l': 'L',
+                                  'unidades': 'und', 'unidad': 'und', 'unds': 'und',
+                                  'piezas': 'pza', 'pieza': 'pza', 'pzas': 'pza',
+                                  'gramos': 'g', 'gramo': 'g', 'grs': 'g', 'g': 'g',
+                                  'libras': 'lb', 'libra': 'lb', 'lbs': 'lb',
+                                  'onzas': 'oz', 'onza': 'oz', 'oz': 'oz',
+                                  'porciones': 'porcion', 'porcion': 'porcion',
+                                  'paquetes': 'pqt', 'paquete': 'pqt',
+                                  'bolsas': 'bolsa', 'bolsa': 'bolsa',
+                                  'cajas': 'caja', 'caja': 'caja',
+                                  'galones': 'gal', 'galon': 'gal'}
+                    unidad = unidad_map.get(unidad_raw, unidad_raw)
+                    
+                    # Extraer motivo del resto del texto
+                    motivo_texto = re.sub(
+                        r'\d+(?:[.,]\d+)?\s*(?:kilos?|kg|litros?|unidades?|'
+                        r'piezas?|gramos?|libras?|onzas?|paquetes?|bolsas?|'
+                        r'cajas?|galones?|porciones?).*?(?:de|en|como|por)\s+merma',
+                        '', parametros, flags=re.IGNORECASE
+                    ).strip()
+                    motivo = motivo_texto if motivo_texto else "Reportado como merma"
+                    costo = 0.0
+                else:
+                    return "Formato: 'producto, cantidad, unidad, motivo, costo' o '23 kilos de cerdo de merma'"
+            
+            id_merma = db.registrar_merma(producto, cantidad, unidad, motivo, costo)
+            return f"Merma registrada (ID: {id_merma}): {cantidad} {unidad} de {producto} - {motivo}"
+        except (ValueError, sqlite3.Error) as e:
+            return f"Error: {str(e)}"
+
+    def _dar_de_baja(parametros: str) -> str:
+        """Da de baja producto del inventario por rotura/dano.
+        Input: 'producto, cantidad, unidad, motivo, costo'
+        Ej: 'plato sopero, 5, piezas, rotura, 25.00'
+        Ej: 'mantel blanco, 2, piezas, quemado, 30.00'"""
         try:
             partes = [p.strip() for p in parametros.split(",")]
             if len(partes) < 4:
-                return "Formato: producto, cantidad, unidad, motivo, costo_opcional"
+                return "Formato: producto, cantidad, unidad, motivo, costo(opcional)"
             producto = partes[0]
             cantidad = float(partes[1])
             unidad = partes[2]
             motivo = partes[3]
             costo = float(partes[4]) if len(partes) > 4 and partes[4] else 0.0
-            id_merma = db.registrar_merma(producto, cantidad, unidad, motivo, costo)
-            return f"Merma registrada (ID: {id_merma}): {cantidad} {unidad} de {producto} - {motivo}"
+            return db.dar_de_baja_inventario(producto, cantidad, unidad, motivo, costo)
         except (ValueError, sqlite3.Error) as e:
             return f"Error: {str(e)}"
 
@@ -2000,6 +2152,287 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
         except sqlite3.Error as e:
             return f"Error: {str(e)}"
 
+    def _registrar_compra(parametros: str) -> str:
+        """Registra compra en lenguaje natural. Input: 'se compro 3 kintales de harina caduca 12-03-2027'."""
+        try:
+            import re
+            p = parametros.lower()
+            cantidad = 1.0
+            unidad = ""
+            producto = ""
+            fecha_cad = ""
+            # Buscar fecha de caducidad en todo el texto
+            match_cad_global = re.search(
+                r'(?:caducidad|caduc[oa]|vence|expira|vencimiento)\s*(?:el\s+)?(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{2}[-/]\d{2})',
+                p
+            )
+            if match_cad_global:
+                fecha_cad = match_cad_global.group(1)
+                # Limpiar el texto de la fecha
+                p_clean = p[:match_cad_global.start()].strip()
+                p_clean = re.sub(r'\s*(?:caducidad|caduc[oa]|vence|expira|vencimiento)\s*$', '', p_clean).strip()
+            else:
+                p_clean = p
+
+            match_cant = re.search(r'(\d+(?:\.\d+)?)\s*(kintales|kintal|quintales|quintal|qq|kilos|kilo|kg|libras|libra|lbs|lb|gramos|gramo|gr|onzas|onza|oz|litros|litro|lts|galones|galon|unidades|unidad|unds|piezas|pieza|pzas|paquetes|paquete|bolsas|bolsa|cajas|caja)\b', p_clean)
+            if match_cant:
+                cantidad = float(match_cant.group(1))
+                unidad = match_cant.group(2)
+                idx = match_cant.end()
+                resto = p_clean[idx:]
+                match_prod = re.match(r'\s*(?:de\s+)?(.+)', resto)
+                if match_prod:
+                    producto = match_prod.group(1).strip()
+            else:
+                match_simple = re.search(r'(?:compr[oa]|compre)\s+(\d+(?:\.\d+)?)\s*(.+)', p_clean)
+                if match_simple:
+                    cantidad = float(match_simple.group(1))
+                    resto = match_simple.group(2).strip()
+                    match_prod = re.match(r'(kintales|kintal|quintales|quintal|qq|kilos|kilo|kg|libras|libra|lbs|lb|gramos|gramo|gr|onzas|onza|oz|litros|litro|lts|galones|galon|unidades|unidad|unds|piezas|pieza|pzas|paquetes|paquete|bolsas|bolsa|cajas|caja)\s+(?:de\s+)?(.+)', resto)
+                    if match_prod:
+                        unidad_match = re.match(r'(kintales|kintal|quintales|quintal|qq|kilos|kilo|kg|libras|libra|lbs|lb|gramos|gramo|gr|onzas|onza|oz|litros|litro|lts|galones|galon|unidades|unidad|unds|piezas|pieza|pzas|paquetes|paquete|bolsas|bolsa|cajas|caja)', resto)
+                        if unidad_match:
+                            unidad = unidad_match.group(1)
+                        producto = match_prod.group(1).strip()
+                    else:
+                        producto = resto
+                else:
+                    producto = p_clean
+            if not producto:
+                return "No se pudo detectar el producto. Intenta: 'se compro 3 kintales de harina caduca 12-03-2027'"
+            if not unidad:
+                unidad = "unidad"
+            # Limpiar sufijos de fecha del nombre del producto
+            producto = re.sub(r'\s*(?:caduc[oa]|vence|expira)\s*$', '', producto).strip()
+            producto = re.sub(r'\s*de\s*$', '', producto).strip()
+            categoria = _detectar_categoria(producto)
+            vida = _estimar_vida_util(producto)
+            
+            # Normalizar unidad
+            unidad_map = {
+                'kintal': 'qq', 'kintales': 'qq', 'quintal': 'qq', 'quintales': 'qq', 'qq': 'qq',
+                'kilo': 'kg', 'kilos': 'kg', 'kg': 'kg',
+                'libra': 'lb', 'libras': 'lb', 'lb': 'lb', 'lbs': 'lb',
+                'gramo': 'g', 'gramos': 'g', 'g': 'g',
+                'onza': 'oz', 'onzas': 'oz', 'oz': 'oz',
+                'litro': 'L', 'litros': 'L', 'l': 'L',
+                'galon': 'gal', 'galones': 'gal', 'gal': 'gal',
+                'unidad': 'und', 'unidades': 'und', 'u': 'und', 'und': 'und',
+            }
+            unidad_norm = unidad_map.get(unidad.lower(), 'und')
+            
+            # Formatear fecha de caducidad (acepta DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY)
+            fecha_cad_fija = None
+            if fecha_cad:
+                partes_f = re.split(r'[-/]', fecha_cad)
+                if len(partes_f) == 3:
+                    if len(partes_f[0]) == 4:
+                        fecha_cad_fija = f"{partes_f[0]}-{partes_f[1].zfill(2)}-{partes_f[2].zfill(2)}"
+                    else:
+                        d, m, a = partes_f
+                        if len(a) == 2:
+                            a = '20' + a
+                        fecha_cad_fija = f"{a}-{m.zfill(2)}-{d.zfill(2)}"
+            
+            # Insertar en catalogo si no existe
+            conn = _obtener_conexion(db)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM Catalogo WHERE LOWER(nombre) = ?", (producto.lower(),))
+            cat = cursor.fetchone()
+            if cat:
+                producto_id = cat[0]
+                producto_nuevo = False
+            else:
+                cursor.execute("INSERT INTO Catalogo (nombre, categoria, vida_util_dias) VALUES (?, ?, ?)",
+                             (producto.strip().title(), categoria, vida))
+                producto_id = cursor.lastrowid
+                producto_nuevo = True
+            
+            # Insertar en Inventario
+            from datetime import date as dt_date
+            fecha_ingreso = dt_date.today().strftime('%Y-%m-%d')
+            id_lote = f"COMPRA-{dt_date.today().strftime('%Y%m%d')}-{producto[:3].upper()}"
+            cursor.execute("""
+                INSERT INTO Inventario 
+                (producto_id, id_lote, fecha_ingreso, cantidad_actual, unidad, fecha_caducidad_fija)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (producto_id, id_lote, fecha_ingreso, cantidad, unidad_norm, fecha_cad_fija))
+            id_inv = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            
+            lineas = [f"COMPRA REGISTRADA (ID: {id_inv})", "=" * 40,
+                      f"  Producto: {producto.strip().title()}", f"  Cantidad: {cantidad} {unidad_norm}",
+                      f"  Categoria: {categoria}", f"  Vida util est: {vida} dias"]
+            if fecha_cad_fija:
+                lineas.append(f"  Caduca: {fecha_cad_fija}")
+            if producto_nuevo:
+                lineas.append(f"  [NUEVO] Producto agregado al catalogo")
+            return "\n".join(lineas)
+        except (ValueError, TypeError, sqlite3.Error) as e:
+            return f"Error: {str(e)}"
+
+    def _registrar_permiso_rapido(parametros: str) -> str:
+        """Registra permiso/ausencia en lenguaje natural. Input: 'juan saco permiso por paternidad 6 dias'."""
+        try:
+            import re
+            from datetime import date, datetime, timedelta
+            p = parametros.lower()
+            id_emp = ""
+            nombre = ""
+            tipo = "permiso_personal"
+            dias_ausencia = 1
+            match_id = re.search(r'\b(emp\d+)\b', p, re.IGNORECASE)
+            if match_id:
+                id_emp = match_id.group(1).upper()
+            else:
+                trabajadores = db.obtener_trabajadores("")
+                for t in trabajadores:
+                    if t['nombre_completo'].lower() in p:
+                        id_emp = t['id_empleado']
+                        nombre = t['nombre_completo']
+                        break
+                if not id_emp:
+                    palabras = parametros.split()
+                    conn = _obtener_conexion(db)
+                    cursor = conn.cursor()
+                    for palabra in palabras:
+                        if len(palabra) > 2:
+                            cursor.execute("SELECT id_empleado, nombre_completo FROM Trabajadores WHERE LOWER(nombre_completo) LIKE LOWER(?)", (f"%{palabra}%",))
+                            row = cursor.fetchone()
+                            if row:
+                                id_emp = row[0]
+                                nombre = row[1]
+                                break
+                    conn.close()
+            if not id_emp:
+                return "Empleado no encontrado. Usa ID (EMP001) o nombre 'Juan Perez'."
+            match_dias = re.search(r'(\d+)\s*(?:dias|días|dia|día)', p)
+            if match_dias:
+                dias_ausencia = int(match_dias.group(1))
+            tipos = {'reposo': 'reposo_medico', 'medico': 'reposo_medico', 'médico': 'reposo_medico',
+                     'maternidad': 'permiso_maternidad', 'paternidad': 'permiso_personal',
+                     'vacaciones': 'vacaciones', 'vacacion': 'vacaciones',
+                     'personal': 'permiso_personal', 'permiso': 'permiso_personal',
+                     'duelo': 'permiso_personal', 'luto': 'permiso_personal'}
+            for k, v in tipos.items():
+                if k in p:
+                    tipo = v
+                    break
+            fecha_ini = date.today().isoformat()
+            fecha_fin = (date.today() + timedelta(days=dias_ausencia)).isoformat()
+            match_ini = re.search(r'(?:desde|del?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})', p)
+            if match_ini:
+                try:
+                    fecha_ini = datetime.strptime(match_ini.group(1), '%d-%m-%Y').strftime('%Y-%m-%d')
+                    fecha_fin = (datetime.strptime(fecha_ini, '%Y-%m-%d') + timedelta(days=dias_ausencia)).strftime('%Y-%m-%d')
+                except ValueError:
+                    pass
+            match_fin = re.search(r'(?:hasta|al?)\s+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})', p)
+            if match_fin:
+                try:
+                    fecha_fin = datetime.strptime(match_fin.group(1), '%d-%m-%Y').strftime('%Y-%m-%d')
+                except ValueError:
+                    pass
+            motivo = ""
+            match_motivo = re.search(r'por\s+(\w+(?:\s+\w+){0,3})', p)
+            if match_motivo:
+                motivo = match_motivo.group(1).strip()
+            resultado = db.registrar_ausencia(id_emp, tipo, fecha_ini, fecha_fin, motivo)
+            return f"Permiso registrado: {nombre or id_emp} ({tipo}) {fecha_ini} -> {fecha_fin} ({dias_ausencia} dias)"
+        except (ValueError, sqlite3.Error) as e:
+            return f"Error: {str(e)}"
+
+    def _consultar_turno_hoy(turno: str = "") -> str:
+        """Consulta personal que trabaja hoy. Input: turno (str, opcional). Ej: 'matutino'."""
+        try:
+            personal = db.obtener_turno_hoy(turno)
+            if not personal:
+                return f"No hay personal trabajando hoy{' en turno ' + turno if turno else ''}."
+            filtro = f"TURNO {turno.upper()}" if turno else "TODOS LOS TURNOS"
+            lineas = [f"PERSONAL DE HOY - {filtro}", "=" * 40]
+            for t in personal:
+                tipo = t.get('tipo_contrato', 'fijo')
+                lineas.append(f"  {t['id_empleado']} - {t['nombre_completo']} ({t['cargo']})")
+                lineas.append(f"    Turno: {t['turno']} | {t.get('hora_entrada', '')}-{t.get('hora_salida', '')} | Contrato: {tipo}")
+            lineas.append(f"\nTotal: {len(personal)} trabajadores activos")
+            return "\n".join(lineas)
+        except (sqlite3.Error, KeyError, AttributeError) as e:
+            return f"Error: {str(e)}"
+
+    def _consultar_personal_activo() -> str:
+        """Lista personal activo (no ausente). Sin input."""
+        try:
+            personal = db.obtener_personal_activo()
+            if not personal:
+                return "No hay personal activo registrado."
+            lineas = ["PERSONAL ACTIVO", "=" * 40]
+            for t in personal:
+                tipo = t.get('tipo_contrato', 'fijo')
+                lineas.append(f"  {t['id_empleado']} - {t['nombre_completo']} ({t['cargo']})")
+                lineas.append(f"    Turno: {t['turno']} | {t.get('hora_entrada', '')}-{t.get('hora_salida', '')} | Contrato: {tipo}")
+            lineas.append(f"\nTotal: {len(personal)} trabajadores activos")
+            return "\n".join(lineas)
+        except (sqlite3.Error, KeyError, AttributeError) as e:
+            return f"Error: {str(e)}"
+
+    def _consultar_personal_ausente() -> str:
+        """Lista personal con ausencias (reposo, maternidad, etc.). Sin input."""
+        try:
+            ausentes = db.obtener_personal_con_ausencia()
+            if not ausentes:
+                return "No hay personal con ausencias registradas."
+            lineas = ["PERSONAL CON AUSENCIAS", "=" * 40]
+            for a in ausentes:
+                estado = a.get('estado', 'desconocido')
+                inicio = a.get('fecha_inicio_ausencia', 'N/A')
+                fin = a.get('fecha_fin_ausencia', 'N/A')
+                motivo = a.get('motivo_ausencia', '')
+                lineas.append(f"  {a['id_empleado']} - {a.get('nombre_completo', '?')} ({a.get('cargo', '')})")
+                lineas.append(f"    Estado: {estado} | {inicio} -> {fin}")
+                if motivo:
+                    lineas.append(f"    Motivo: {motivo}")
+            lineas.append(f"\nTotal: {len(ausentes)} con ausencias")
+            return "\n".join(lineas)
+        except (sqlite3.Error, KeyError, AttributeError) as e:
+            return f"Error: {str(e)}"
+
+    def _registrar_ausencia(parametros: str) -> str:
+        """Registra ausencia. Input: 'id_empleado, tipo, fecha_inicio, fecha_fin, motivo(opcional)'. Tipos: reposo_medico, permiso_maternidad, vacaciones, permiso_personal"""
+        try:
+            partes = [p.strip() for p in parametros.split(",")]
+            if len(partes) < 4:
+                return "Formato: id_empleado, tipo, fecha_inicio, fecha_fin, motivo(opcional)"
+            id_emp = partes[0]
+            tipo = partes[1].lower().replace(" ", "_")
+            fecha_ini = partes[2]
+            fecha_fin = partes[3]
+            motivo = partes[4] if len(partes) > 4 else ""
+            tipos_validos = ['reposo_medico', 'permiso_maternidad', 'vacaciones', 'permiso_personal']
+            if tipo not in tipos_validos:
+                return f"Tipo invalido: {tipo}. Validos: {', '.join(tipos_validos)}"
+            resultado = db.registrar_ausencia(id_emp, tipo, fecha_ini, fecha_fin, motivo)
+            return f"Ausencia registrada para {id_emp}: {tipo} ({fecha_ini} -> {fecha_fin})"
+        except (sqlite3.Error, ValueError) as e:
+            return f"Error: {str(e)}"
+
+    def _reincorporar_trabajador(id_empleado: str) -> str:
+        """Reincorpora trabajador tras ausencia. Input: id_empleado. Ej: 'EMP001'"""
+        try:
+            resultado = db.reincorporar_trabajador(id_empleado.strip())
+            return resultado
+        except (sqlite3.Error, ValueError) as e:
+            return f"Error: {str(e)}"
+
+    def _seed_mermas(dias: str = "30") -> str:
+        """Genera datos realistas de mermas de restaurante. Input: dias (int, opcional, default 30). Ej: '30'"""
+        try:
+            d = int(dias) if dias else 30
+            return db.seed_mermas_realistas(d)
+            return f"Datos de mermas generados: {resultado}"
+        except (ValueError, sqlite3.Error) as e:
+            return f"Error: {str(e)}"
+
     # =========================================================================
     # TRABAJADORES Y SOBRANTES REUTILIZABLES
     # =========================================================================
@@ -2025,6 +2458,10 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             h_entrada = partes[4]
             h_salida = partes[5]
             descanso = partes[6] if len(partes) > 6 else ""
+            tipo_contrato = partes[7] if len(partes) > 7 else ""
+            estado = partes[8] if len(partes) > 8 else "activo"
+            fecha_inicio = partes[9] if len(partes) > 9 else ""
+            fecha_fin = partes[10] if len(partes) > 10 else ""
             return db.registrar_trabajador(
                 id_emp,
                 nombre,
@@ -2033,6 +2470,10 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 h_entrada,
                 h_salida,
                 descanso,
+                tipo_contrato,
+                estado,
+                fecha_inicio,
+                fecha_fin,
             )
         except sqlite3.Error as e:
             return f"Error: {str(e)}"
@@ -2043,19 +2484,26 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             trabajadores = db.obtener_trabajadores(turno)
             if not trabajadores:
                 return "No hay trabajadores registrados."
+            from datetime import date
+            hoy = date.today().isoformat()
+            ausentes = db.obtener_personal_ausente(hoy)
+            ids_ausentes = set(a['id_empleado'] for a in ausentes) if ausentes else set()
             lineas = [
                 "TRABAJADORES",
                 "=" * 40,
             ]
             for t in trabajadores:
+                estado = t.get('estado', 'activo')
+                ausente = " [AUSENTE]" if t['id_empleado'] in ids_ausentes else ""
                 lineas.append(
                     f"  {t['id_empleado']} - "
-                    f"{t['nombre_completo']} ({t['cargo']})"
+                    f"{t['nombre_completo']} ({t['cargo']}){ausente}"
                 )
                 lineas.append(
                     f"    Turno: {t['turno']} | "
-                    f"{t['hora_entrada']}-{t['hora_salida']} | "
-                    f"Descanso: {t['dias_descanso'] or 'N/A'}"
+                    f"{t.get('hora_entrada', '')}-{t.get('hora_salida', '')} | "
+                    f"Descanso: {t.get('dias_descanso') or 'N/A'} | "
+                    f"Estado: {estado}"
                 )
             return "\n".join(lineas)
         except sqlite3.Error as e:
@@ -2361,7 +2809,9 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
         Tool(name="configurar_menu_semanal", func=_configurar_menu_semanal,
              description="Configura el menú semanal. Input: 'Lunes | entrante=SOP-021, plato_fuerte=PLF-018, postre=POS-006'"),
         Tool(name="registrar_merma", func=_registrar_merma,
-             description="Registra merma. Input: 'producto, cantidad, unidad, motivo, costo' Ej: 'pollo, 2, kg, contaminado, 5.50'"),
+             description="Registra merma. Input: 'producto, cantidad, unidad, motivo, costo' o lenguaje natural: '23 kilos de cerdo de merma'"),
+        Tool(name="dar_de_baja", func=_dar_de_baja,
+             description="Da de baja producto del inventario por rotura/dano/extravio. Input: 'producto, cantidad, unidad, motivo, costo'. Ej: 'plato sopero, 5, piezas, rotura, 25.00'"),
         Tool(name="reporte_mermas", func=_reporte_mermas,
              description="Reporte de mermas. Input: dias (int, opcional). Ej: '30'"),
         Tool(name="generar_orden_compra", func=_generar_orden_compra,
@@ -2388,6 +2838,22 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
              description="Registra un trabajador. Input: 'ID, nombre, cargo, turno, hora_entrada, hora_salida, dias_descanso(opcional)'. Turnos: matutino, vespertino, nocturno, mixto"),
         Tool(name="listar_trabajadores", func=_listar_trabajadores,
              description="Lista trabajadores. Input: turno (str, opcional). Ej: 'matutino'"),
+        Tool(name="consultar_turno_hoy", func=_consultar_turno_hoy,
+             description="Consulta personal que trabaja hoy. Input: turno (str, opcional). Ej: 'matutino'"),
+        Tool(name="consultar_personal_activo", func=_consultar_personal_activo,
+             description="Lista personal activo (no ausente). Sin input."),
+        Tool(name="consultar_personal_ausente", func=_consultar_personal_ausente,
+             description="Lista personal con ausencias (reposo, maternidad, etc.). Sin input."),
+        Tool(name="registrar_ausencia", func=_registrar_ausencia,
+             description="Registra ausencia. Input: 'id_empleado, tipo, fecha_inicio, fecha_fin, motivo(opcional)'. Tipos: reposo_medico, permiso_maternidad, vacaciones, permiso_personal"),
+        Tool(name="reincorporar_trabajador", func=_reincorporar_trabajador,
+             description="Reincorpora trabajador tras ausencia. Input: id_empleado. Ej: 'EMP001'"),
+        Tool(name="seed_mermas", func=_seed_mermas,
+             description="Genera datos realistas de mermas de restaurante. Input: dias (int, opcional, default 30). Ej: '30'"),
+        Tool(name="registrar_compra", func=_registrar_compra,
+             description="Registra compra en lenguaje natural. Input: 'se compro 3 kintales de harina caduca 12-03-2027'. Detecta producto, cantidad, unidad, fecha caducidad."),
+        Tool(name="registrar_permiso_rapido", func=_registrar_permiso_rapido,
+             description="Registra permiso/ausencia en lenguaje natural. Input: 'juan saco permiso por paternidad 6 dias'. Calcula automaticamente la fecha de retorno."),
         Tool(name="registrar_sobrante", func=_registrar_sobrante,
              description="Registra sobrante reutilizable. Input: 'producto, cantidad, unidad, id_empleado(opcional), turno(opcional), dias_reutilizacion(opcional)'"),
         Tool(name="dashboard_sobrantes", func=_dashboard_sobrantes,
