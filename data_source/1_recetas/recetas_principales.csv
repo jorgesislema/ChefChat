@@ -1,0 +1,6 @@
+id_receta,nombre,categoria,tiempo_prep,costo,Ingredientes_Estructurados,alergenos,instrucciones
+REC001,Pato a la Naranja,Principal,90,45.50,"1|unidad|pato;200|gr|naranja;50|ml|vino blanco;10|gr|sal;5|gr|pimienta",gluten,"1. Sazonar el pato. 2. Hornear a 180°C por 60 min. 3. Preparar salsa con naranja y vino."
+REC002,Arroz a la Cubana,Principal,30,12.00,"200|gr|arroz;2|unidad|huevo;100|gr|tomate;50|gr|jamon;30|ml|aceite",gluten,"1. Cocinar arroz. 2. Freír huevo. 3. Servir con tomate y jamón."
+REC003,Ceviche de Pescado,Entrada,45,25.00,"300|gr|pescado;100|ml|limon;50|gr|cebolla;30|gr|cilantro;10|gr|sal",pescado,"1. Cortar pescado en cubos. 2. Marinar con limón 30 min. 3. Agregar cebolla y cilantro."
+REC004,Lomo Saltado,Principal,40,35.00,"400|gr|lomo;200|gr|papa;100|gr|tomate;50|gr|cebolla;30|ml|soya;20|ml|vinagre",soya,"1. Saltear lomo. 2. Agregar vegetales. 3. Servir con arroz."
+REC005,Causa Rellena,Entrada,60,18.00,"500|gr|papa amarilla;200|gr|pollo;100|gr|palta;50|ml|aceite;30|ml|limon;10|gr|aji",ninguno,"1. Hacer masa de papa. 2. Rellenar con pollo y palta. 3. Decorar y servir."

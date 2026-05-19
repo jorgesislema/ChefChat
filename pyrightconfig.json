@@ -1,0 +1,15 @@
+{
+    "venvPath": ".",
+    "venv": ".venv",
+    "typeCheckingMode": "basic",
+    "reportMissingModuleSource": false,
+    "reportMissingTypeStubs": false,
+    "reportUnusedImport": "warning",
+    "stubPath": "",
+    "useLibraryCodeForTypes": true,
+    "exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        ".venv"
+    ]
+}

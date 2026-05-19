@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+*.spec
+.pytest_cache/
+.mypy_cache/
+
+# Base de datos (contiene datos locales)
+*.db
+*.sqlite
+
+# Entorno y logs
+.env
+logs/
+*.log
+
+# Sandbox temporal
+C:\Temp\ChefChat_Sandbox\
+
+# Exportaciones de telemetria (datos generados)
+telemetry_exports/
+
+# Documentacion interna (opcional, descomentar si se desea incluir)
+# docs_internos/
+
+# Archivos generados
+*.xlsx
+*.csv

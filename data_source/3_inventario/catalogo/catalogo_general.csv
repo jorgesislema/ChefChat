@@ -1,0 +1,16 @@
+id_producto,nombre,categoria,tipo_caducidad,vida_util_dias
+PROD001,Pato,Carnes,Dinamica,3
+PROD002,Naranja,Frutas,Dinamica,7
+PROD003,Arroz,Granos,Fija,365
+PROD004,Huevo,Proteinas,Dinamica,21
+PROD005,Tomate,Vegetales,Dinamica,5
+PROD006,Jamon,Embutidos,Dinamica,15
+PROD007,Pescado,Carnes,Dinamica,2
+PROD008,Limon,Frutas,Dinamica,14
+PROD009,Cebolla,Vegetales,Dinamica,30
+PROD010,Cilantro,Verduras,Dinamica,7
+PROD011,Lomo,Carnes,Dinamica,5
+PROD012,Papa,Vegetales,Dinamica,21
+PROD013,Palta,Frutas,Dinamica,4
+PROD014,Pollo,Carnes,Dinamica,3
+PROD015,Vino Blanco,Bebidas,Fija,730
