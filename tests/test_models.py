@@ -82,11 +82,12 @@ class TestAccionOffice:
         assert accion.herramienta == "word"
 
     def test_herramienta_invalida_rechaza(self) -> None:
+        """Test that invalid tool names are rejected."""
         with pytest.raises(ValidationError):
             AccionOffice(
-                herramienta="powerpoint",
+                herramienta="photoshop",  # Invalid tool
                 operacion="crear",
-                ruta_archivo="test.pptx",
+                ruta_archivo="test.psd",
                 payload={},
             )
 

@@ -1,4 +1,5 @@
 import keyring
+from keyring import errors as keyring_errors
 import os
 from typing import Optional, Dict, List
 from enum import Enum
@@ -11,6 +12,7 @@ class AIProvider(Enum):
     CLAUDE = "claude"
     OPENAI = "openai"
     OPENCODE = "opencode"
+    OLLAMA = "ollama"
 
 
 class ConfigManager:
@@ -23,6 +25,7 @@ class ConfigManager:
         AIProvider.CLAUDE: "claude_key",
         AIProvider.OPENAI: "openai_key",
         AIProvider.OPENCODE: "opencode_key",
+        AIProvider.OLLAMA: "ollama_key",
     }
 
     PROVIDER_NAMES: Dict[AIProvider, str] = {
@@ -31,7 +34,8 @@ class ConfigManager:
         AIProvider.GEMINI: "Google Gemini",
         AIProvider.CLAUDE: "Claude (Anthropic)",
         AIProvider.OPENAI: "OpenAI (GPT-4, GPT-3.5)",
-        AIProvider.OPENCODE: "OpenCode (Big Pickle 🆓)",
+        AIProvider.OPENCODE: "OpenCode (Big Pickle)",
+        AIProvider.OLLAMA: "Ollama (Local)",
     }
 
     PROVIDER_MODELS: Dict[AIProvider, List[str]] = {
@@ -41,6 +45,7 @@ class ConfigManager:
         AIProvider.CLAUDE: ["claude-3-5-sonnet-20240620", "claude-3-opus", "claude-3-haiku"],
         AIProvider.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
         AIProvider.OPENCODE: ["big-pickle", "open-code-v1", "code-assistant"],
+        AIProvider.OLLAMA: ["llama3.2", "llama3.1", "mistral", "codellama", "phi3", "gemma2"],
     }
 
     @staticmethod
@@ -60,7 +65,7 @@ class ConfigManager:
         try:
             key_id = ConfigManager.PROVIDER_KEY_IDS[provider]
             keyring.delete_password(ConfigManager.SERVICE_NAME, key_id)
-        except keyring.errors.PasswordDeleteError:
+        except keyring_errors.PasswordDeleteError:
             pass
 
     @staticmethod

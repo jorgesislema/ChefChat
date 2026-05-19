@@ -1,6 +1,8 @@
-import pytest
+"""Tests for Worker class."""
+
 import threading
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+# pylint: disable=no-name-in-module
 from PyQt6.QtCore import QCoreApplication
 from gui.worker import Worker
 
@@ -9,6 +11,7 @@ class TestWorkerHITL:
     def test_worker_se_crea_correctamente(
         self, mock_orchestrator: MagicMock, qapp: QCoreApplication
     ) -> None:
+        assert qapp is not None
         worker = Worker(mock_orchestrator, message="test message")
         assert worker.pause_condition is not None
         assert isinstance(worker.pause_condition, threading.Event)
@@ -19,6 +22,7 @@ class TestWorkerHITL:
     def test_worker_stop_sets_running_false(
         self, mock_orchestrator: MagicMock, qapp: QCoreApplication
     ) -> None:
+        assert qapp is not None
         worker = Worker(mock_orchestrator, message="test")
         worker.start()
         assert worker.isRunning()
@@ -28,6 +32,7 @@ class TestWorkerHITL:
     def test_aprobar_accion_sets_event(
         self, mock_orchestrator: MagicMock, qapp: QCoreApplication
     ) -> None:
+        assert qapp is not None
         worker = Worker(mock_orchestrator, message="test")
         worker.pause_condition.set()
         assert worker.pause_condition.is_set() is True
@@ -39,6 +44,7 @@ class TestWorkerHITL:
     def test_rechazar_accion_sets_event_and_emits(
         self, mock_orchestrator: MagicMock, qapp: QCoreApplication
     ) -> None:
+        assert qapp is not None
         worker = Worker(mock_orchestrator, message="test")
         result_message = []
 
@@ -55,8 +61,9 @@ class TestWorkerHITL:
     def test_worker_is_waiting_flag(
         self, mock_orchestrator: MagicMock, qapp: QCoreApplication
     ) -> None:
+        assert qapp is not None
         worker = Worker(mock_orchestrator, message="test")
         assert worker.is_waiting_for_approval() is False
-        worker._is_waiting = True
+        worker._is_waiting = True  # pylint: disable=protected-access
         worker.pause_condition.clear()
         assert worker.is_waiting_for_approval() is True

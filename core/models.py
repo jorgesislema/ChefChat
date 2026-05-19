@@ -5,7 +5,7 @@ Este módulo define todos los esquemas de datos validados que utiliza
 el sistema para operaciones de inventario, recetas, ventas e incidencias.
 """
 
-from typing import List, Optional
+from typing import List
 from datetime import datetime, date
 from pydantic import BaseModel, Field, field_validator
 import re
@@ -83,25 +83,25 @@ class Evento(BaseModel):
 
 
 class AccionOffice(BaseModel):
-    """Modelo legacy para acciones de Office (compatibilidad con Worker)."""
+    """Modelo para acciones de Office con soporte COM (Word, Excel, PowerPoint)."""
     herramienta: str = Field(...)
     operacion: str = Field(...)
-    ruta_archivo: str = Field(..., min_length=1)
+    ruta_archivo: str = Field(default="", min_length=0)
     payload: dict = Field(default_factory=dict)
     requiere_hitl: bool = Field(default=True)
 
     @field_validator("herramienta")
     @classmethod
     def herramienta_valida(cls, v: str) -> str:
-        if v.lower() not in {"word", "excel"}:
-            raise ValueError("Herramienta debe ser 'word' o 'excel'")
-        return v.lower()
+        if v.lower() not in {"word", "excel", "powerpoint", "power point"}:
+            raise ValueError("Herramienta debe ser 'word', 'excel' o 'powerpoint'")
+        return "powerpoint" if v.lower() == "power point" else v.lower()
 
     @field_validator("operacion")
     @classmethod
     def operacion_valida(cls, v: str) -> str:
-        if v.lower() not in {"leer", "escribir", "crear"}:
-            raise ValueError("Operacion debe ser 'leer', 'escribir' o 'crear'")
+        if v.lower() not in {"leer", "escribir", "crear", "enviar", "plantilla"}:
+            raise ValueError("Operacion debe ser 'leer', 'escribir', 'crear', 'enviar' o 'plantilla'")
         return v.lower()
 
     def to_dict(self) -> dict:
@@ -265,24 +265,6 @@ class VentasHistoricas(BaseModel):
     def ganancia_total(self) -> float:
         """Calcula la ganancia total de la venta."""
         return self.margen_unitario * self.unidades_vendidas
-
-
-class Receta(BaseModel):
-    """
-    Modelo para recetas del restaurante.
-    
-    Attributes:
-        id: Identificador único de la receta.
-        nombre: Nombre de la receta.
-        ingredientes: Lista de ingredientes con cantidades.
-        comensales: Número de comensales que rinde la receta.
-        costo_produccion: Costo total de producción.
-    """
-    id: int = Field(..., gt=0)
-    nombre: str = Field(..., min_length=1, max_length=200)
-    ingredientes: List[dict] = Field(default_factory=list)
-    comensales: int = Field(..., gt=0)
-    costo_produccion: float = Field(..., ge=0)
 
 
 class IncidenciaInput(BaseModel):
