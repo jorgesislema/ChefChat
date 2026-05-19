@@ -220,6 +220,46 @@ Agentes:
 | Caducidad | Productos a 3 dias | Recetas para aprovecharlos |
 | Stock bajo | < 5 unidades | Generar lista de compras |
 
+## 8. Contratos Pydantic (v2.0)
+
+`core/models.py` — 30 modelos con validacion estricta de tipos, unidades, estados y fechas:
+
+### Personal (4 modelos)
+| Modelo | Valida | Propiedades |
+|--------|--------|-------------|
+| Trabajador | id_empleado, cargo, turno (4), estado (7), tipo_contrato (4) | en_ausencia, dias_para_retorno |
+| AusenciaInput | tipo (6), fechas ISO YYYY-MM-DD | - |
+| ReincorporarInput | id_empleado | - |
+| PermisoRapidoInput | mensaje 10-500 chars | - |
+
+### Mermas (2)
+| Modelo | Valida |
+|--------|--------|
+| MermaInput | producto, cantidad>0, costo>=0 |
+| MermaReporteOutput | periodo_dias, totales, por_tipo, por_dia, top_productos |
+
+### Compras e Inventario (3)
+| Modelo | Valida |
+|--------|--------|
+| CompraInput | mensaje, cant>0, categoria |
+| BajaInventarioInput | producto, cant>0, motivo, costo>=0 |
+| Inventario (actualizado) | 35 unidades validas (antes 8) |
+
+### Menu (2)
+| Modelo | Valida |
+|--------|--------|
+| MenuPlato | dia (7), servicio (6: desayuno, almuerzo, merienda, cena, a_la_carta, especial), precio>=0 |
+| MenuSemanalOutput | semana, platos[], costo_promedio |
+
+### Documentos y Alertas (2)
+| Modelo | Valida |
+|--------|--------|
+| DocumentoRAGModel | tipo (7: receta, catalogo, lotes, manual_bpm, generico, capacitacion, personal) |
+| AlertasOutput | personal_ausente[], productos_por_caducar[], stock_bajo[], sugerencias[] |
+
+### Legacy (11)
+Ingrediente, Receta, Evento, AccionOffice, Catalogo, VistaCaducidad, BitacoraDiaria, VentasHistoricas, IncidenciaInput, UsoInventarioInput, EscalarRecetaInput, CaducidadInput, AnalisisRentabilidadOutput
+
 ## 8. Exportacion a Office (Mejorado)
 
 - Exporta datos tabulares desde contexto guardado (no solo texto)
@@ -265,7 +305,7 @@ Todos los prompts del sistema estan en ingles para ahorrar ~28% de tokens. Cada 
 
 ## 12. Pruebas
 
-### Suite de Tests (38 tests)
+### Suite de Tests (51 tests)
 
 | Modulo | Tests |
 |--------|-------|
@@ -274,6 +314,7 @@ Todos los prompts del sistema estan en ingles para ahorrar ~28% de tokens. Cada 
 | DSPy Optimizer | 8 |
 | Multiagent | 13 |
 | Integracion | 3 |
+| Modelos Pydantic | 13 |
 
 ```bash
 python -m pytest tests/ -v

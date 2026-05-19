@@ -99,9 +99,24 @@ python -m pytest tests/ -v      # Tests
 - Rate limiting, filtrado de contenido
 - HITL para acciones Office
 
+## Contratos Pydantic (30 modelos)
+
+`core/models.py` — Validacion estricta de datos:
+
+| Categoria | Modelos |
+|-----------|---------|
+| Personal | Trabajador, AusenciaInput, ReincorporarInput, PermisoRapidoInput |
+| Mermas | MermaInput, MermaReporteOutput |
+| Compras | CompraInput, BajaInventarioInput |
+| Menu | MenuPlato, MenuSemanalOutput |
+| Documentos | DocumentoRAGModel |
+| Alertas | AlertasOutput |
+| Inventario | Catalogo, Inventario (35 unidades), VistaCaducidad |
+| Legacy | Ingrediente, Receta, Evento, AccionOffice, VentasHistoricas |
+
 ## Pruebas
 
-38 tests pasan. Cobertura: Guardrails (10), Ollama (4), DSPy (8), Multiagent (13), Integracion (3).
+51 tests pasan (38 core + 13 modelos).
 
 ## Licencia
 

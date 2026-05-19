@@ -115,15 +115,15 @@ class AccionOffice(BaseModel):
 
 class Catalogo(BaseModel):
     """
-    Modelo para el catálogo de productos del restaurante.
+    Modelo para el catalogo de productos del restaurante.
     
     Attributes:
-        id: Identificador único del producto.
+        id: Identificador unico del producto (0 para nuevos).
         nombre: Nombre del producto (ej. 'Fresa', 'Pollo').
-        categoria: Categoría del producto (Fresco, Congelado, Seco, etc.).
-        vida_util_dias: Días de vida útil desde la fecha de ingreso.
+        categoria: Categoria del producto (Fresco, Congelado, Seco, etc.).
+        vida_util_dias: Dias de vida util desde la fecha de ingreso.
     """
-    id: int = Field(..., gt=0)
+    id: int = Field(default=0, ge=0)
     nombre: str = Field(..., min_length=1, max_length=100)
     categoria: str = Field(..., min_length=1, max_length=50)
     vida_util_dias: int = Field(..., gt=0, le=365)
@@ -148,8 +148,8 @@ class Inventario(BaseModel):
         cantidad: Cantidad disponible del producto.
         unidad: Unidad de medida (kg, g, L, unidad, etc.).
     """
-    id: int = Field(..., gt=0)
-    producto_id: int = Field(..., gt=0)
+    id: int = Field(default=0, ge=0)
+    producto_id: int = Field(default=0, ge=0)
     fecha_ingreso: date = Field(...)
     cantidad: float = Field(..., gt=0)
     unidad: str = Field(..., min_length=1, max_length=20)
@@ -158,10 +158,16 @@ class Inventario(BaseModel):
     @classmethod
     def validar_unidad(cls, v: str) -> str:
         """Valida que la unidad sea una de las permitidas."""
-        unidades_validas = {"kg", "g", "l", "ml", "unidad", "pieza", "paquete", "caja"}
+        unidades_validas = {
+            "kg", "g", "l", "ml", "unidad", "und", "pieza", "pza",
+            "paquete", "pqt", "caja", "bolsa", "qq", "quintal", "kintal",
+            "porcion", "botella", "gal", "galon", "lb", "libra", "oz", "onza",
+            "lote", "cubeta", "saco", "bidon", "rollo", "pliego", "tarro",
+            "frasco", "sobre", "barra", "display", "bulto", "charola"
+        }
         v_lower = v.lower().strip()
         if v_lower not in unidades_validas:
-            raise ValueError(f"Unidad '{v}' no válida. Use: {unidades_validas}")
+            raise ValueError(f"Unidad '{v}' no valida. Use: {sorted(unidades_validas)}")
         return v_lower
 
     def calcular_fecha_caducidad(self, vida_util_dias: int) -> date:
@@ -327,4 +333,218 @@ class AnalisisRentabilidadOutput(BaseModel):
     vacas: List[dict] = Field(default_factory=list)
     interrogantes: List[dict] = Field(default_factory=list)
     perros: List[dict] = Field(default_factory=list)
+    resumen: str = Field(default="")
+
+
+# =============================================================================
+# MODELOS v2.0 - Personal, Mermas, Compras, Menu, Documentos
+# =============================================================================
+
+
+class Trabajador(BaseModel):
+    """Personal del restaurante."""
+    id_empleado: str = Field(..., min_length=3, max_length=20)
+    nombre_completo: str = Field(..., min_length=1, max_length=100)
+    cargo: str = Field(..., min_length=1, max_length=50)
+    turno: str = Field(..., min_length=3, max_length=20)
+    hora_entrada: str = Field(default="", max_length=10)
+    hora_salida: str = Field(default="", max_length=10)
+    dias_descanso: str = Field(default="")
+    tipo_contrato: str = Field(default="fijo")
+    estado: str = Field(default="activo")
+    fecha_inicio_contrato: date | None = Field(default=None)
+    fecha_fin_contrato: date | None = Field(default=None)
+    fecha_inicio_ausencia: date | None = Field(default=None)
+    fecha_fin_ausencia: date | None = Field(default=None)
+    motivo_ausencia: str = Field(default="")
+
+    @field_validator("tipo_contrato")
+    @classmethod
+    def validar_contrato(cls, v: str) -> str:
+        tipos = {"fijo", "temporal", "practicante", "honorarios"}
+        if v.lower() not in tipos:
+            raise ValueError(f"Tipo contrato '{v}' no valido. Use: {tipos}")
+        return v.lower()
+
+    @field_validator("estado")
+    @classmethod
+    def validar_estado(cls, v: str) -> str:
+        estados = {"activo", "reposo_medico", "permiso_maternidad",
+                   "permiso_personal", "vacaciones", "suspendido", "baja"}
+        if v.lower() not in estados:
+            raise ValueError(f"Estado '{v}' no valido. Use: {estados}")
+        return v.lower()
+
+    @field_validator("turno")
+    @classmethod
+    def validar_turno(cls, v: str) -> str:
+        turnos = {"matutino", "vespertino", "nocturno", "mixto"}
+        if v.lower() not in turnos:
+            raise ValueError(f"Turno '{v}' no valido. Use: {turnos}")
+        return v.lower()
+
+    @property
+    def en_ausencia(self) -> bool:
+        return self.estado != "activo"
+
+    @property
+    def dias_para_retorno(self) -> int | None:
+        if self.fecha_fin_ausencia:
+            return (self.fecha_fin_ausencia - date.today()).days
+        return None
+
+
+class AusenciaInput(BaseModel):
+    """Registro de ausencia de personal."""
+    id_empleado: str = Field(..., min_length=3, max_length=20)
+    tipo: str = Field(...)
+    fecha_inicio: str = Field(..., min_length=10, max_length=10)
+    fecha_fin: str = Field(..., min_length=10, max_length=10)
+    motivo: str = Field(default="")
+
+    @field_validator("tipo")
+    @classmethod
+    def validar_tipo_ausencia(cls, v: str) -> str:
+        tipos = {"reposo_medico", "permiso_maternidad", "vacaciones",
+                 "permiso_personal", "permiso_paternidad", "suspendido"}
+        v_norm = v.lower().replace(" ", "_")
+        if v_norm not in tipos:
+            raise ValueError(f"Tipo ausencia '{v}' no valido. Use: {tipos}")
+        return v_norm
+
+    @field_validator("fecha_inicio", "fecha_fin")
+    @classmethod
+    def validar_fecha_iso(cls, v: str) -> str:
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", v):
+            raise ValueError("Fecha debe estar en formato YYYY-MM-DD")
+        return v
+
+
+class ReincorporarInput(BaseModel):
+    """Reincorporacion de trabajador tras ausencia."""
+    id_empleado: str = Field(..., min_length=3, max_length=20)
+
+
+class PermisoRapidoInput(BaseModel):
+    """Registro de permiso en lenguaje natural."""
+    mensaje: str = Field(..., min_length=10, max_length=500)
+
+
+class MermaInput(BaseModel):
+    """Registro de merma/desperdicio."""
+    producto: str = Field(..., min_length=1, max_length=100)
+    cantidad: float = Field(..., gt=0)
+    unidad: str = Field(..., min_length=1, max_length=20)
+    motivo: str = Field(..., min_length=1, max_length=200)
+    costo_estimado: float = Field(default=0.0, ge=0)
+
+    @field_validator("producto")
+    @classmethod
+    def limpiar_producto(cls, v: str) -> str:
+        return v.strip().title()
+
+
+class MermaReporteOutput(BaseModel):
+    """Reporte de mermas en un periodo."""
+    periodo_dias: int = Field(default=7, gt=0, le=365)
+    total_registros: int = Field(default=0, ge=0)
+    cantidad_total: float = Field(default=0.0, ge=0)
+    costo_total: float = Field(default=0.0, ge=0)
+    por_tipo: dict = Field(default_factory=dict)
+    por_dia: dict = Field(default_factory=dict)
+    top_productos: list = Field(default_factory=list)
+    resumen: str = Field(default="")
+
+
+class CompraInput(BaseModel):
+    """Registro de compra en lenguaje natural o estructurado."""
+    mensaje: str = Field(..., min_length=5, max_length=500)
+    # Campos extraidos automaticamente:
+    producto: str = Field(default="")
+    cantidad: float = Field(default=0.0, gt=0)
+    unidad: str = Field(default="")
+    fecha_caducidad: str = Field(default="")
+    categoria: str = Field(default="General")
+
+    @field_validator("producto")
+    @classmethod
+    def limpiar_producto(cls, v: str) -> str:
+        return v.strip().title() if v else v
+
+
+class BajaInventarioInput(BaseModel):
+    """Dar de baja producto del inventario (rotura/dano)."""
+    producto: str = Field(..., min_length=1, max_length=100)
+    cantidad: float = Field(..., gt=0)
+    unidad: str = Field(..., min_length=1, max_length=20)
+    motivo: str = Field(..., min_length=1, max_length=200)
+    costo: float = Field(default=0.0, ge=0)
+
+
+class MenuPlato(BaseModel):
+    """Plato individual del menu semanal."""
+    id_plan: str = Field(default="")
+    dia_semana: str = Field(..., min_length=3, max_length=15)
+    tipo_servicio: str = Field(..., min_length=3, max_length=20)
+    nombre_plato: str = Field(..., min_length=1, max_length=200)
+    precio_venta: float = Field(default=0.0, ge=0)
+    requiere_prep_previa: bool = Field(default=False)
+
+    @field_validator("dia_semana")
+    @classmethod
+    def validar_dia(cls, v: str) -> str:
+        dias = {"lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"}
+        if v.lower() not in dias:
+            raise ValueError(f"Dia '{v}' no valido. Use: {dias}")
+        return v.title()
+
+    @field_validator("tipo_servicio")
+    @classmethod
+    def validar_servicio(cls, v: str) -> str:
+        servicios = {"desayuno", "almuerzo", "merienda", "cena", "a_la_carta", "especial"}
+        v_norm = v.lower().replace(" ", "_")
+        if v_norm not in servicios:
+            raise ValueError(f"Servicio '{v}' no valido. Use: {servicios}")
+        return v_norm
+
+
+class MenuSemanalOutput(BaseModel):
+    """Menu semanal completo."""
+    semana: str = Field(default="")
+    total_platos: int = Field(default=0, ge=0)
+    platos: List[MenuPlato] = Field(default_factory=list)
+    costo_promedio: float = Field(default=0.0, ge=0)
+    resumen: str = Field(default="")
+
+
+class DocumentoRAGModel(BaseModel):
+    """Documento almacenado en el sistema RAG."""
+    id: int = Field(default=0, ge=0)
+    tipo: str = Field(...)
+    nombre: str = Field(..., min_length=1, max_length=255)
+    path: str = Field(default="")
+    extension: str = Field(default="")
+    tamano_bytes: int = Field(default=0, ge=0)
+    contenido_preview: str = Field(default="")
+    contenido_completo: str = Field(default="")
+    palabras_clave: str = Field(default="")
+    fecha_ingreso: datetime | None = Field(default=None)
+    estado: str = Field(default="activo")
+
+    @field_validator("tipo")
+    @classmethod
+    def validar_tipo_doc(cls, v: str) -> str:
+        tipos = {"receta", "catalogo_inventario", "lotes_inventario",
+                 "manual_bpm", "generico", "capacitacion", "personal"}
+        if v.lower() not in tipos:
+            raise ValueError(f"Tipo documento '{v}' no valido. Use: {tipos}")
+        return v.lower()
+
+
+class AlertasOutput(BaseModel):
+    """Alertas cruzadas generadas por el sistema."""
+    personal_ausente: List[dict] = Field(default_factory=list)
+    productos_por_caducar: List[dict] = Field(default_factory=list)
+    stock_bajo: List[dict] = Field(default_factory=list)
+    sugerencias: List[str] = Field(default_factory=list)
     resumen: str = Field(default="")

@@ -400,6 +400,122 @@
 </tr>
 </tbody>
 </table>
+<h2>8. Contratos Pydantic (v2.0)</h2>
+<p><code>core/models.py</code> — 30 modelos con validacion estricta de tipos, unidades, estados y fechas:</p>
+<h3>Personal (4 modelos)</h3>
+<table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>Valida</th>
+<th>Propiedades</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Trabajador</td>
+<td>id_empleado, cargo, turno (4), estado (7), tipo_contrato (4)</td>
+<td>en_ausencia, dias_para_retorno</td>
+</tr>
+<tr>
+<td>AusenciaInput</td>
+<td>tipo (6), fechas ISO YYYY-MM-DD</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ReincorporarInput</td>
+<td>id_empleado</td>
+<td>-</td>
+</tr>
+<tr>
+<td>PermisoRapidoInput</td>
+<td>mensaje 10-500 chars</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<h3>Mermas (2)</h3>
+<table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>Valida</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MermaInput</td>
+<td>producto, cantidad&gt;0, costo&gt;=0</td>
+</tr>
+<tr>
+<td>MermaReporteOutput</td>
+<td>periodo_dias, totales, por_tipo, por_dia, top_productos</td>
+</tr>
+</tbody>
+</table>
+<h3>Compras e Inventario (3)</h3>
+<table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>Valida</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CompraInput</td>
+<td>mensaje, cant&gt;0, categoria</td>
+</tr>
+<tr>
+<td>BajaInventarioInput</td>
+<td>producto, cant&gt;0, motivo, costo&gt;=0</td>
+</tr>
+<tr>
+<td>Inventario (actualizado)</td>
+<td>35 unidades validas (antes 8)</td>
+</tr>
+</tbody>
+</table>
+<h3>Menu (2)</h3>
+<table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>Valida</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MenuPlato</td>
+<td>dia (7), servicio (6: desayuno, almuerzo, merienda, cena, a_la_carta, especial), precio&gt;=0</td>
+</tr>
+<tr>
+<td>MenuSemanalOutput</td>
+<td>semana, platos[], costo_promedio</td>
+</tr>
+</tbody>
+</table>
+<h3>Documentos y Alertas (2)</h3>
+<table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>Valida</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DocumentoRAGModel</td>
+<td>tipo (7: receta, catalogo, lotes, manual_bpm, generico, capacitacion, personal)</td>
+</tr>
+<tr>
+<td>AlertasOutput</td>
+<td>personal_ausente[], productos_por_caducar[], stock_bajo[], sugerencias[]</td>
+</tr>
+</tbody>
+</table>
+<h3>Legacy (11)</h3>
+<p>Ingrediente, Receta, Evento, AccionOffice, Catalogo, VistaCaducidad, BitacoraDiaria, VentasHistoricas, IncidenciaInput, UsoInventarioInput, EscalarRecetaInput, CaducidadInput, AnalisisRentabilidadOutput</p>
 <h2>8. Exportacion a Office (Mejorado)</h2>
 <ul>
 <li>Exporta datos tabulares desde contexto guardado (no solo texto)</li>
@@ -502,7 +618,7 @@
 - Sin dependencias externas (python-docx puro, sin WeasyPrint/GTK)
 - Accesible desde el boton en la sidebar</p>
 <h2>12. Pruebas</h2>
-<h3>Suite de Tests (38 tests)</h3>
+<h3>Suite de Tests (51 tests)</h3>
 <table>
 <thead>
 <tr>
@@ -530,6 +646,10 @@
 <tr>
 <td>Integracion</td>
 <td>3</td>
+</tr>
+<tr>
+<td>Modelos Pydantic</td>
+<td>13</td>
 </tr>
 </tbody>
 </table>
