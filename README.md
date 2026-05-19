@@ -1,216 +1,123 @@
-# ChefChat Pro 🍳
+# ChefChat Pro
 
-Asistente de escritorio con IA para gestion integral de restaurantes. Combina agentes especializados, RAG, proteccion contra inyeccion de prompts e integracion con Microsoft Office con aprobacion humana en el ciclo (HITL).
+Asistente de escritorio con IA para gestion integral de restaurantes. Sistema multiagente donde cada agente tiene su propio prompt de sistema, usa el LLM seleccionado por el usuario, y responde solo con datos del RAG. Integracion con Microsoft Office, alertas cruzadas entre agentes, y gestion de personal.
 
-## Caracteristicas
+## Novedades v2.0
 
-- **Orquestador de Agentes**: Routing inteligente a agentes especializados (Recetas, Inventario, Menus, Mermas, Documentos)
-- **Sistema Multiagente**: Planner + Executor con 5 agentes especializados para tareas complejas
-- **Guardrails**: Proteccion contra inyeccion de prompts con 23 patrones de deteccion, validacion de entrada, rate limiting y filtrado de contenido
-- **RAG**: Busqueda de documentos y recetas con expansion de consultas y sinonimos culinarios
-- **Proveedores de IA**: OpenRouter, Azure OpenAI, Ollama (local gratuito)
-- **HITL**: Aprobacion humana obligatoria para acciones criticas en Word/Excel
-- **Telemetria**: Registro de metricas y rendimiento con exportacion CSV/JSON
-- **DSPy Optimizer**: Optimizacion de prompts con few-shot examples y feedback de relevancia
+- **5 agentes con prompts individuales**: Recipe, Inventory, Menu, Waste, Document. Cada uno con su `system_prompt` y acceso al LLM compartido.
+- **Alertas cruzadas**: Al iniciar sesion, alerta sobre personal ausente, productos por caducar con sugerencias de recetas, y stock bajo.
+- **Compras en lenguaje natural**: "se compro 3 kintales de harina caduca 12-03-2027"
+- **Gestion de personal**: Registro de ausencias (reposo, maternidad, paternidad), consulta de turnos, personal activo/ausente.
+- **Mermas realistas**: Generacion de datos de desperdicio con patrones de restaurante real (160 registros).
+- **Menu semanal**: 28 platos cargados (Lunes-Domingo, 4 servicios/dia).
+- **Exportacion mejorada**: Word/Excel/PPT con datos tabulares, limpieza de Markdown, contexto automatico.
+- **Duplicados**: Deteccion al cargar documentos, no permite carga repetida.
+- **Prompts en ingles**: ~28% ahorro de tokens, respuestas en espanol.
+- **Documentacion**: Boton en sidebar genera Word + HTML profesional desde `resumen.md`.
+- **Selector de agente**: Barra dedicada para elegir agente especifico o Auto.
 
-## Estructura del Proyecto
+## Estructura
 
 ```
 ChefChat/
-├── main.py                    # Punto de entrada
-├── requirements.txt           # Dependencias
-├── chefchat.db                # Base de datos SQLite
-├── .gitignore                 # Archivos excluidos de git
+├── main.py                    # Entrada
+├── documentacion.py           # Generador Word + HTML
 │
-├── agents/                    # Agentes de IA
-│   ├── orchestrator.py        # Orquestador principal
-│   ├── multiagent.py          # Sistema multiagente (Planner + Executor)
-│   ├── tools.py               # Herramientas disponibles
-│   └── mcp_client.py          # Cliente MCP para Office
+├── agents/
+│   ├── orchestrator.py        # Routing 9 prioridades + alertas
+│   ├── multiagent.py          # 5 agentes con prompts + LLM
+│   ├── tools.py               # 58 herramientas
+│   ├── alertas.py             # Alertas cruzadas
+│   └── mcp_client.py          # Word/Excel/PPT
 │
-├── core/                      # Componentes centrales
-│   ├── config.py              # Configuracion y proveedores AI
-│   ├── models.py              # Modelos Pydantic
-│   └── rag_classifier.py      # Clasificador RAG
-│
-├── data/                      # Gestion de datos
-│   ├── db_manager.py          # Gestor de base de datos
-│   ├── rag_store.py           # Almacen RAG
-│   └── menu_semanal.py        # CRUD MenuSemanalPro
-│
-├── data_source/               # Fuentes de datos externas
-│   ├── 1_recetas/             # Recetas en CSV
-│   └── 3_inventario/          # Catalogo e inventario
-│
-├── evaluation/                # Evaluaciones y metricas
-│
-├── gui/                       # Interfaz grafica PyQt6
-│   ├── main_window.py         # Ventana principal
-│   ├── worker.py              # Worker thread con HITL
-│   └── telemetry_view.py      # Vista de telemetria
-│
-├── ops/                       # Operaciones y seguridad
-│   └── guardrails.py          # Proteccion contra inyeccion
-│
-├── prompting/                 # Optimizacion de prompts
-│   └── dspy_optimizer.py      # Optimizador estilo DSPy
-│
-├── scripts/                   # Scripts de utilidad
-│   ├── data_seeder.py         # Poblacion inicial de datos
-│   ├── cargar_capacitacion.py # Carga de documentos
-│   ├── diagnose_keys.py       # Diagnostico de API keys
-│   ├── check_setup.py         # Verificacion de configuracion
-│   └── security_scan.py       # Escaneo de seguridad
-│
-├── tests/                     # Pruebas unitarias e integracion
-│   ├── conftest.py            # Configuracion de pytest
-│   ├── test_new_modules.py    # 38 tests para modulos nuevos
-│   ├── test_gui.py            # Tests de interfaz grafica
-│   ├── test_mcp.py            # Tests de integracion MCP
-│   ├── test_models.py         # Tests de modelos Pydantic
-│   ├── test_worker.py         # Tests de worker threads
-│   └── [otros tests]          # Tests de evaluacion, menus, etc.
-│
-├── telemetry_exports/         # Exportaciones de telemetria
-│
-└── docs_internos/             # Documentacion interna
-    ├── resumen.md             # Resumen general del proyecto
-    ├── architecture.md        # Arquitectura conceptual
-    ├── MANUAL.md              # Manual de usuario
-    └── [otros documentos]     # Evaluaciones, seguridad, etc.
+├── core/                      # Config, modelos, seguridad
+├── data/                      # DB manager, RAG store, menu semanal
+├── gui/                       # PyQt6: main window, worker, telemetry
+├── ops/                       # Guardrails (23 patrones)
+├── prompting/                 # DSPy optimizer
+├── scripts/                   # Data seeder, diagnostico
+├── tests/                     # 38 tests
+└── docs_internos/             # Documentacion
 ```
-
-## Requisitos
-
-- Python 3.13+
-- Windows 10/11
-- PyQt6
-- OpenRouter API key (opcional, Ollama es gratuito)
 
 ## Instalacion
 
 ```bash
-# Clonar repositorio
-git clone <url-del-repo>
+git clone <url>
 cd ChefChat
-
-# Crear entorno virtual
 python -m venv .venv
 .venv\Scripts\activate
-
-# Instalar dependencias
 pip install -r requirements.txt
+python main.py
 ```
 
 ## Uso
 
 ```bash
-# Iniciar aplicacion
-python main.py
-
-# Ejecutar tests
-python -m pytest tests/ -v
-
-# Verificar configuracion
-python scripts/check_setup.py
-
-# Escaneo de seguridad
-python scripts/security_scan.py
+python main.py                  # Iniciar app
+python documentacion.py         # Generar docs
+python -m pytest tests/ -v      # Tests
 ```
 
-## Configuracion de Proveedores de IA
+## Proveedores IA
 
-### OpenRouter (Principal)
-1. Obtener API key en https://openrouter.ai
-2. Configurar en la aplicacion (boton de llave)
+| Proveedor | Modelo |
+|-----------|--------|
+| DeepSeek | deepseek-chat |
+| OpenRouter | minimax-2.7b |
+| Ollama | llama3.2 (gratis) |
+| OpenAI | gpt-4o |
+| Claude | claude-3-5-sonnet |
+| Gemini | gemini-1.5-flash |
+| OpenCode | big-pickle (gratis) |
 
-### Ollama (Local Gratuito)
-1. Instalar Ollama desde https://ollama.ai
-2. Descargar modelo: `ollama pull llama3.2`
-3. Seleccionar Ollama en la aplicacion
+## Agentes
 
-### Azure OpenAI (Enterprise)
-1. Crear recurso en Azure Portal
-2. Configurar endpoint y API key
-3. Seleccionar en la aplicacion
+| Agente | Prompt | Funcion |
+|--------|--------|---------|
+| RecipeAgent | Executive Chef | Buscar/escalar recetas del RAG |
+| InventoryAgent | Inventory Manager | Stock, caducidades, compras inteligentes |
+| MenuAgent | Planning Chef | Menus semanales, anti-desperdicio |
+| WasteAgent | Waste Controller | Dashboard, reportes, registro |
+| DocumentAgent | Compliance Officer | Docs RAG + gestion de personal |
 
-## Arquitectura
+## GUI
 
-### Patron Principal
-Clean Architecture + MVC + Orquestador de Agentes
-
-### Flujo de Procesamiento
-1. Usuario envia peticion en GUI
-2. Guardrails valida la entrada
-3. Orchestrator clasifica intencion y detecta prioridad
-4. DSPy Optimizer expande y optimiza prompt
-5. Routing a agente especializado o sistema multiagente
-6. Respuesta formateada y enviada a GUI
-7. Telemetria registrada
-
-### Sistema Multiagente
-- **Planner**: Analiza peticion compleja, asigna tareas por prioridad
-- **Executor**: Ejecuta tareas, combina resultados, maneja errores
-- **Agentes**: Recipe, Inventory, Menu, Waste, Document
-
-### HITL (Human-in-the-Loop)
-- Aprobacion obligatoria para acciones criticas en Word/Excel
-- QThread se pausa con `event.wait()` hasta aprobacion
-- Preview en panel derecho de GUI
+| Elemento | Funcion |
+|----------|---------|
+| Selector Proveedor/Modelo | Elegir IA |
+| Selector Agente | Auto o agente especifico |
+| Chat | Burbujas HTML con temas |
+| Sidebar | Chat, Telemetria, Config, Limpiar, Docs, Tema |
+| Botones Office | Word, Excel, PowerPoint |
+| HITL Bar | Aprobacion de acciones criticas |
 
 ## Seguridad
 
-- API Keys almacenadas en keyring del SO
-- Guardrails intercepta prompts maliciosos
-- Sandbox para pruebas MCP
-- Zero credenciales en codigo
+- API Keys en keyring del SO (nunca en codigo)
+- Guardrails: 23 patrones anti-inyeccion
+- Rate limiting, filtrado de contenido
+- HITL para acciones Office
+
+## Contratos Pydantic (30 modelos)
+
+`core/models.py` — Validacion estricta de datos:
+
+| Categoria | Modelos |
+|-----------|---------|
+| Personal | Trabajador, AusenciaInput, ReincorporarInput, PermisoRapidoInput |
+| Mermas | MermaInput, MermaReporteOutput |
+| Compras | CompraInput, BajaInventarioInput |
+| Menu | MenuPlato, MenuSemanalOutput |
+| Documentos | DocumentoRAGModel |
+| Alertas | AlertasOutput |
+| Inventario | Catalogo, Inventario (35 unidades), VistaCaducidad |
+| Legacy | Ingrediente, Receta, Evento, AccionOffice, VentasHistoricas |
 
 ## Pruebas
 
-```bash
-# Todos los tests
-python -m pytest tests/ -v
-
-# Tests especificos
-python -m pytest tests/test_new_modules.py -v
-python -m pytest tests/test_gui.py -v
-python -m pytest tests/test_mcp.py -v
-```
-
-### Resultados Actuales
-- **78 tests pasan**, 4 skipped, 2 errors (autenticacion externa)
-- Cobertura: Guardrails (10), Ollama (4), DSPy (8), Multiagent (13), Integracion (3)
-
-## Documentacion
-
-- `docs_internos/resumen.md` - Resumen completo del proyecto
-- `docs_internos/MANUAL.md` - Manual de usuario
-- `docs_internos/architecture.md` - Arquitectura conceptual
-- `docs_internos/INFORME_EVALUACION.md` - Informes de evaluacion
-
-## Limitaciones Conocidas
-
-### RAG
-- Usa SQLite `LIKE` para busqueda por keywords
-- No usa embeddings semanticos → falla en consultas semanticas
-- **Mejora pendiente**: Implementar FAISS/Chroma + sentence-transformers
-
-### HITL
-- Flag `requiere_hitl` existe pero UI de aprobacion inactiva
-- **Mejora pendiente**: Implementar UI de aprobacion y cola pendiente
-
-## Proximos Pasos
-
-1. Implementar embeddings reales para RAG
-2. Implementar UI de aprobacion HITL con cola pendiente
-3. Agregar contratos Pydantic para validacion estricta
-4. Soporte .env para configuracion flexible
-5. GitHub Secret Scanning + Dependabot
+51 tests pasan (38 core + 13 modelos).
 
 ## Licencia
 
-Propietario - ChefChat Pro v1.0
-
----
-
-*Ultima actualizacion: Mayo 2026*
+Propietario - ChefChat Pro v2.0
