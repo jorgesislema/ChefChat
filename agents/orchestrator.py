@@ -325,11 +325,22 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
             logging.critical(f"Client created: {client}")
             logging.critical(f"Client base_url: {client.base_url}")
 
+            from openai import OpenAI
+            from langchain_openai import ChatOpenAI
+            from pydantic import SecretStr
+            
+            # OpenRouter requires HTTP-Referer and X-Title headers
+            openrouter_headers = {
+                "HTTP-Referer": "https://opencode.ai",
+                "X-Title": "ChefChat"
+            }
+            
             self.llm = ChatOpenAI(
-                model_name=self.model_name,
-                api_key=self.api_key,  # Pass api_key directly to ChatOpenAI
-                base_url=self.base_url if self.base_url else None,  # Pass base_url directly
+                model=self.model_name,
+                openai_api_key=self.api_key,
+                openai_api_base=self.base_url,
                 temperature=0.7,
+                default_headers=openrouter_headers,
             )
             
             logging.critical(f"ChatOpenAI created successfully: {self.llm}")
