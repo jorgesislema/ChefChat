@@ -170,6 +170,21 @@ def generate_stylesheet(theme: Dict[str, str]) -> str:
         opacity: 0.8;
     }}
 
+    QPushButton#btn_clear {{
+        background-color: {theme['bg_tertiary']};
+        color: {theme['text_primary']};
+        border: 1px solid {theme['border']};
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-size: 9pt;
+    }}
+
+    QPushButton#btn_clear:hover {{
+        background-color: {theme['warning']};
+        color: white;
+        border-color: {theme['warning']};
+    }}
+
     QPushButton#btn_selector_config {{
         background-color: {theme['bg_tertiary']};
         border: 1px solid {theme['border']};
@@ -382,6 +397,7 @@ class MainWindow(QMainWindow):
         self.btn_word: Optional[QPushButton] = None
         self.btn_excel: Optional[QPushButton] = None
         self.btn_ppt: Optional[QPushButton] = None
+        self.btn_clear: Optional[QPushButton] = None
         self.btn_config: Optional[QPushButton] = None
         self._left_widget: Optional[QWidget] = None
         self.telemetry_dashboard: Optional[TelemetryDashboard] = None
@@ -569,6 +585,12 @@ class MainWindow(QMainWindow):
         action_layout.addWidget(self.btn_ppt)
         
         action_layout.addStretch()
+        
+        self.btn_clear = QPushButton("🧹 Limpiar")
+        self.btn_clear.setObjectName("btn_clear")
+        self.btn_clear.setToolTip("Limpiar chat")
+        self.btn_clear.clicked.connect(self._on_clear_chat)
+        action_layout.addWidget(self.btn_clear)
         
         return action_bar
 
@@ -893,6 +915,7 @@ class MainWindow(QMainWindow):
             self.worker.chunk_recibido.connect(self._on_chunk_received)
             self.worker.respuesta_completada.connect(self._on_response_completed)
             self.worker.error_occurred.connect(self._on_error)
+            self.worker.requiere_aprobacion.connect(self._on_requires_approval)
             self.worker.start()
         except (KeyError, ValueError, RuntimeError, TypeError, OSError) as e:
             # Capturar errores comunes (KeyError, ValueError, RuntimeError, TypeError, OSError)
@@ -932,6 +955,19 @@ class MainWindow(QMainWindow):
         chat_area.append(ChatBubble.system_bubble(message, self.current_theme))
         chat_area.moveCursor(QTextCursor.MoveOperation.End)
 
+    def _on_clear_chat(self) -> None:
+        chat_area = self.chat_area
+        if chat_area is not None:
+            chat_area.clear()
+        self._chat_history = []
+        self._ultima_respuesta = None
+        if self.btn_word is not None:
+            self.btn_word.setEnabled(False)
+        if self.btn_excel is not None:
+            self.btn_excel.setEnabled(False)
+        if self.btn_ppt is not None:
+            self.btn_ppt.setEnabled(False)
+
     @pyqtSlot(str)
     def _on_chunk_received(self, chunk: str) -> None:
         self._ultima_respuesta = chunk
@@ -957,6 +993,7 @@ class MainWindow(QMainWindow):
         """Envía la última respuesta a la aplicación de Office."""
         from agents.mcp_client import MCPClient
         from core.models import AccionOffice
+        import re
 
         contenido = self._ultima_respuesta or (self._chat_history[-1] if self._chat_history else "")
         contenido = contenido.strip()
@@ -965,9 +1002,15 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            if self._ultimo_id_receta and app in ("word", "excel", "powerpoint"):
+            recipe_id = self._ultimo_id_receta
+            if not recipe_id:
+                match = re.search(r'\b((?:SPO|SOP|BEB|ENS|POS|ENT|PLF|EVT)[-_]\d{2,4})\b', contenido.upper())
+                if match:
+                    recipe_id = match.group(1)
+
+            if recipe_id and app in ("word", "excel", "powerpoint"):
                 self._append_system_message(
-                    f"⏳ Enviando {self._ultimo_id_receta} a {app.title()}..."
+                    f"⏳ Enviando {recipe_id} a {app.title()}..."
                 )
                 from agents.tools import crear_herramientas_operativas
                 tools = crear_herramientas_operativas(self.db)
@@ -979,7 +1022,7 @@ class MainWindow(QMainWindow):
                 tool_name = tool_map[app]
                 tool = next((t for t in tools if t.name == tool_name), None)
                 if tool is not None and tool.func is not None:
-                    resultado = tool.func(self._ultimo_id_receta)
+                    resultado = tool.func(recipe_id)
                     self._append_system_message(f"✅ {resultado}")
                     return
 
@@ -1009,7 +1052,7 @@ class MainWindow(QMainWindow):
                     "contenido": contenido,
                     "formato": {"titulo": titulo}
                 },
-                requiere_hitl=False
+                requiere_hitl=True
             ))
             if isinstance(resultado_obj, dict):
                 mensaje = resultado_obj.get("mensaje", "OK")
@@ -1026,6 +1069,19 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def _on_error(self, error: str) -> None:
         self._append_system_message(f"❌ Error: {error}")
+
+    @pyqtSlot(object)
+    def _on_requires_approval(self, accion) -> None:
+        """Muestra la barra HITL cuando se requiere aprobación."""
+        from core.models import AccionOffice
+        if self.hitl_bar is not None:
+            app_name = {"word": "Word", "excel": "Excel", "powerpoint": "PowerPoint"}.get(accion.herramienta, accion.herramienta)
+            op_name = {"enviar": "enviar a", "plantilla": "aplicar plantilla"}.get(accion.operacion, accion.operacion)
+            hitl_label = self.hitl_bar.findChild(QLabel)
+            if hitl_label:
+                hitl_label.setText(f"⚠️ Aprobación requerida: {op_name} {app_name}")
+            self.hitl_bar.setVisible(True)
+            self._append_system_message(f"⏳ Esperando aprobación para {op_name} {app_name}...")
 
     @pyqtSlot()
     def _on_approve_action(self) -> None:

@@ -66,6 +66,34 @@ class Worker(QThread):
                     f"Intenta con un modelo más rápido o verifica tu conexión."
                 )
             
+            # Detectar HITL action
+            if isinstance(respuesta, dict) and respuesta.get("_hitl"):
+                accion = respuesta.get("_accion")
+                mensaje_preview = respuesta.get("_mensaje", "Aprobación requerida")
+                if accion:
+                    self.accion_pendiente = accion
+                    self._is_waiting = True
+                    self.pause_condition.clear()
+                    self.requiere_aprobacion.emit(accion)
+                    self.pause_condition.wait()
+                    self._is_waiting = False
+                    
+                    if self.accion_pendiente is None:
+                        self.chunk_recibido.emit("❌ Acción rechazada por el usuario")
+                        self.respuesta_completada.emit("❌ Acción rechazada por el usuario")
+                        return
+                    
+                    # Ejecutar la acción aprobada
+                    from agents.mcp_client import MCPClient
+                    cliente = MCPClient()
+                    resultado = cliente.ejecutar_herramienta(self.accion_pendiente)
+                    self.accion_pendiente = None
+                    
+                    respuesta_final = f"✅ {mensaje_preview}: {resultado.get('mensaje', 'OK')}"
+                    self.chunk_recibido.emit(respuesta_final)
+                    self.respuesta_completada.emit(respuesta_final)
+                    return
+            
             self.chunk_recibido.emit(respuesta)
             self.respuesta_completada.emit(respuesta)
                 

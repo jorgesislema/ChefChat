@@ -195,27 +195,56 @@ class MCPClient:
 
     def _enviar_a_excel(self, accion: AccionOffice) -> Dict[str, Any]:
         try:
+            import re
             excel = self._get_excel_app()
+
+            contenido = accion.payload.get("contenido", "")
+            datos = accion.payload.get("datos", [])
+
+            # Detect dashboard export filepath pattern
+            filepath_match = re.search(r'(dashboard_\w+_\d+\.xlsx)', contenido)
+            if filepath_match and not datos:
+                filepath = filepath_match.group(1)
+                abs_path = os.path.abspath(filepath)
+                if os.path.exists(abs_path):
+                    try:
+                        wb = excel.Workbooks.Open(abs_path)
+                        return {"status": "ok", "mensaje": f"Dashboard abierto: {filepath}"}
+                    except (PythonComError, AttributeError) as e:
+                        pass
+
             wb = excel.ActiveWorkbook
             if not wb:
                 wb = excel.Workbooks.Add()
             ws = wb.ActiveSheet
 
-            datos = accion.payload.get("datos", [])
             insertar_en = accion.payload.get("insertar_en", "A1")
 
             if not datos:
-                return {"status": "error", "mensaje": "No hay datos para enviar"}
+                if contenido:
+                    titulo = accion.payload.get("formato", {}).get("titulo", "ChefChat")
+                    lineas = contenido.strip().split("\n")
+                    datos = [[titulo]] + [[linea[:255]] for linea in lineas if linea.strip()]
+                    insertar_en = "A1"
+                else:
+                    return {"status": "error", "mensaje": "No hay datos para enviar"}
 
             if isinstance(datos, list) and all(isinstance(r, list) for r in datos):
                 start_col = ord(insertar_en[0].upper()) - ord('A') + 1
                 start_row = int(insertar_en[1:]) if len(insertar_en) > 1 else 1
+                max_cols = max(len(r) for r in datos) if datos else 1
                 for i, row in enumerate(datos):
                     for j, val in enumerate(row):
-                        cell = ws.Cells(start_row + i, start_col + j)
-                        cell.Value = str(val) if val is not None else ""
-                rng = ws.Range(ws.Cells(start_row, start_col), ws.Cells(start_row + len(datos) - 1, start_col + len(datos[0]) - 1))
-                rng.EntireColumn.AutoFit()
+                        try:
+                            cell = ws.Cells(start_row + i, start_col + j)
+                            cell.Value = str(val)[:1024] if val is not None else ""
+                        except (PythonComError, AttributeError):
+                            pass
+                try:
+                    rng = ws.Range(ws.Cells(start_row, start_col), ws.Cells(start_row + len(datos) - 1, start_col + max_cols - 1))
+                    rng.EntireColumn.AutoFit()
+                except (PythonComError, AttributeError):
+                    pass
             elif isinstance(datos, dict):
                 start_col = ord(insertar_en[0].upper()) - ord('A') + 1
                 start_row = int(insertar_en[1:]) if len(insertar_en) > 1 else 1
@@ -223,11 +252,14 @@ class MCPClient:
                     ws.Cells(start_row, start_col + j).Value = str(key)
                     if isinstance(value, list):
                         for i, v in enumerate(value):
-                            ws.Cells(start_row + 1 + i, start_col + j).Value = str(v) if v is not None else ""
+                            ws.Cells(start_row + 1 + i, start_col + j).Value = str(v)[:1024] if v is not None else ""
                     else:
-                        ws.Cells(start_row + 1, start_col + j).Value = str(value) if value is not None else ""
-                rng = ws.Range(ws.Cells(start_row, start_col), ws.Cells(start_row + 1, start_col + len(datos) - 1))
-                rng.EntireColumn.AutoFit()
+                        ws.Cells(start_row + 1, start_col + j).Value = str(value)[:1024] if value is not None else ""
+                try:
+                    rng = ws.Range(ws.Cells(start_row, start_col), ws.Cells(start_row + 1, start_col + max(len(datos), 1) - 1))
+                    rng.EntireColumn.AutoFit()
+                except (PythonComError, AttributeError):
+                    pass
 
             return {"status": "ok", "mensaje": f"Datos enviados a Excel en {insertar_en}"}
         except (PythonComError, AttributeError, ValueError, TypeError) as e:

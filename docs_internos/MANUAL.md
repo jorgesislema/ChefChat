@@ -17,8 +17,10 @@ Sistema Operativo para Restaurantes - 30 herramientas profesionales
 9. [Plantillas](#9-plantillas)
 10. [Turnos de Cocina](#10-turnos-de-cocina)
 11. [Incidencias](#11-incidencias)
-12. [Prefijos de Recetas](#12-prefijos-de-recetas)
-13. [Flujo de Trabajo Recomendado](#13-flujo-de-trabajo-recomendado)
+12. [Telemetría](#12-telemetría)
+13. [Interfaz](#13-interfaz)
+14. [Prefijos de Recetas](#14-prefijos-de-recetas)
+15. [Flujo de Trabajo Recomendado](#15-flujo-de-trabajo-recomendado)
 
 ---
 
@@ -37,8 +39,10 @@ EVT-014
 ```
 busca la receta Sopa de Calabacitas con Queso
 dame la receta Arroz con Leche Andino
-busca POS-011
+busca Pato a la Naranja
+encuentra receta de ceviche
 ```
+Busca en toda la base de recetas por coincidencia de nombre, incluso con palabras sueltas.
 
 ### Escalar receta (multiplicar ingredientes)
 ```
@@ -259,7 +263,18 @@ Abre Excel automáticamente y genera un libro profesional con **2 hojas** y **4 
 
 ## 8. Office y Documentos
 
-Los botones **Word**, **Excel** y **PowerPoint** en la interfaz envían el contenido actual al programa de Office correspondiente.
+### Buscar documentos cargados
+```
+busca documento BPM
+buscar documento buenas practicas
+documento protocolo
+manual de capacitacion
+```
+Muestra el nombre, tipo y **contenido completo** del documento encontrado (hasta 3000 caracteres).
+
+Los documentos se cargan con el boton **📂 +** (esquina inferior izquierda) desde archivos CSV, Markdown o Word.
+
+### Enviar a Office
 
 ### Enviar receta a Word
 ```
@@ -338,7 +353,48 @@ registrar_incidencia Equipo, Horno no enciende
 
 ---
 
-## 12. Prefijos de Recetas
+## 12. Telemetría
+
+El panel de telemetría (botón **📊** en la barra lateral izquierda) muestra en tiempo real:
+
+- **Gasto Total USD** — costo acumulado del mes en llamadas al LLM
+- **Tokens Totales** — tokens de entrada y salida consumidos
+- **Peticiones API** — cantidad de llamadas realizadas este mes
+- **Tabla de registros** — últimas 50 operaciones con modelo, tokens, costo y tipo de operación
+
+Cada operación (búsqueda de recetas, menú, reportes, chat con IA) se registra automáticamente con su tipo específico. Las operaciones locales con herramientas no generan costo; solo las llamadas al modelo de IA facturan tokens.
+
+El panel se actualiza automáticamente cada 30 segundos.
+
+---
+
+## 13. Interfaz
+
+### Barra lateral (izquierda)
+| Botón | Función |
+|-------|---------|
+| 💬 | Panel de chat |
+| 📊 | Panel de telemetría |
+| ⚙️ | Configurar API Keys |
+| 🌙/☀️ | Cambiar tema oscuro/claro |
+
+### Barra de acciones (inferior)
+| Botón | Función |
+|-------|---------|
+| 📂 + | Cargar documentos (CSV, MD, Word) |
+| 📄 Word | Enviar respuesta a Word |
+| 📊 Excel | Enviar respuesta a Excel |
+| 📽️ PPT | Enviar respuesta a PowerPoint |
+| 🧹 Limpiar | Limpiar el chat y resetear historial |
+
+### Selector superior
+- **Proveedor**: elige entre OpenRouter, DeepSeek, Gemini, Claude, OpenAI, OpenCode, Ollama
+- **Modelo**: selecciona el modelo específico del proveedor
+- **⚙️**: acceso rapido a configuracion de API Keys
+
+---
+
+## 14. Prefijos de Recetas
 
 | Prefijo | Categoría | Ejemplo |
 |---------|-----------|---------|
@@ -356,7 +412,7 @@ registrar_incidencia Equipo, Horno no enciende
 
 ---
 
-## 13. Flujo de Trabajo Recomendado
+## 15. Flujo de Trabajo Recomendado
 
 ### Diario
 1. `menú del día` → ver el menú

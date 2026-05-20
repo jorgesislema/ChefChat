@@ -105,21 +105,43 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
     # =========================================================================
     
     def _buscar_receta(nombre_o_id: str) -> str:
-        """Busca receta por nombre o ID en SQLite."""
+        """Busca receta por nombre o ID en SQLite con búsqueda progresiva."""
         try:
             conn = _obtener_conexion(db)
             cursor = conn.cursor()
-            
+
             # Buscar en RecetasRAG (tabla correcta)
             cursor.execute("SELECT * FROM RecetasRAG WHERE id_receta = ?", (nombre_o_id,))
             row = cursor.fetchone()
             if not row:
-                cursor.execute("SELECT * FROM RecetasRAG WHERE LOWER(nombre) LIKE LOWER(?)", (f"%{nombre_o_id}%",))
+                # Búsqueda exacta con LIKE
+                cursor.execute(
+                    "SELECT * FROM RecetasRAG WHERE LOWER(nombre) LIKE LOWER(?)",
+                    (f"%{nombre_o_id}%",)
+                )
                 row = cursor.fetchone()
+
+            # Búsqueda por palabras sueltas (fuzzy-like fallback)
+            if not row:
+                palabras = nombre_o_id.strip().split()
+                if len(palabras) >= 2:
+                    conditions = []
+                    params = []
+                    for palabra in palabras:
+                        if len(palabra) >= 3:
+                            conditions.append("LOWER(nombre) LIKE LOWER(?)")
+                            params.append(f"%{palabra}%")
+                    if conditions:
+                        cursor.execute(
+                            f"SELECT * FROM RecetasRAG WHERE {' AND '.join(conditions)}",
+                            params
+                        )
+                        row = cursor.fetchone()
+
             if not row:
                 conn.close()
                 return f"Receta '{nombre_o_id}' no encontrada."
-            
+
             receta = dict(row)
             ingredientes_raw = receta.get("ingredientes_json")
 
@@ -254,15 +276,16 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             conn = _obtener_conexion(db)
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT c.nombre, c.categoria, i.cantidad_actual, i.unidad, i.fecha_caducidad,
-                       CAST(julianday(i.fecha_caducidad) - julianday('now') AS INTEGER) as dias_restantes
+                SELECT c.nombre, c.categoria, i.cantidad_actual, i.unidad,
+                       COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) as fecha_cad,
+                       CAST(julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') AS INTEGER) as dias_restantes
                 FROM Inventario i
                 JOIN Catalogo c ON i.producto_id = c.id
                 WHERE i.cantidad_actual > 0 
-                  AND i.fecha_caducidad IS NOT NULL
-                  AND julianday(i.fecha_caducidad) - julianday('now') <= ?
-                  AND julianday(i.fecha_caducidad) - julianday('now') >= 0
-                ORDER BY i.fecha_caducidad ASC
+                  AND (i.fecha_caducidad_fija IS NOT NULL OR c.vida_util_dias IS NOT NULL)
+                  AND julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') <= ?
+                  AND julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') >= 0
+                ORDER BY dias_restantes ASC
             """, (dias,))
             rows = cursor.fetchall()
             conn.close()
@@ -294,10 +317,10 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             conn = _obtener_conexion(db)
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT c.nombre, SUM(l.cantidad_actual) as total, l.unidad
-                FROM lotes_inventario l
-                JOIN catalogo_inventario c ON l.producto_id = c.id_producto
-                GROUP BY c.nombre, l.unidad
+                SELECT c.nombre, SUM(i.cantidad_actual) as total, i.unidad
+                FROM Inventario i
+                JOIN Catalogo c ON i.producto_id = c.id
+                GROUP BY c.nombre, i.unidad
                 HAVING total < ?
                 ORDER BY total ASC
             """, (umbral,))
@@ -445,7 +468,7 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                     continue
                 
                 nombre_receta, ingredientes_json, porciones_base = row
-                _procesar_ingredientes_receta(cursor, nombre_receta, ingredientes_json, porciones_base, comensales, ingredientes_totales)
+                _procesar_ingredientes_receta(nombre_receta, ingredientes_json, porciones_base, comensales, ingredientes_totales)
             
             conn2 = _obtener_conexion(db)
             cursor2 = conn2.cursor()
@@ -796,9 +819,11 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
         alertas = []
         if fecha_evento:
             cursor.execute("""
-                SELECT nombre_producto, dias_restantes
-                FROM vista_caducidad_activa
-                WHERE fecha_caducidad <= date(?)
+                SELECT c.nombre as nombre_producto,
+                       CAST(julianday(i.fecha_caducidad_fija) - julianday('now') AS INTEGER) as dias_restantes
+                FROM Inventario i
+                JOIN Catalogo c ON i.producto_id = c.id
+                WHERE i.fecha_caducidad_fija <= date(?)
                 ORDER BY dias_restantes ASC
             """, (fecha_evento,))
             alertas = [dict(row) for row in cursor.fetchall()]
@@ -981,15 +1006,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 lineas.append(f"\nInstrucciones: {receta['instrucciones']}")
 
             contenido = "\n".join(lineas)
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="word",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"contenido": contenido, "formato": {"titulo": receta["nombre"]}},
-                requiere_hitl=False
-            ))
-            return f"Receta enviada a Word: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": "Receta lista para enviar a Word"}
         except (sqlite3.Error, json.JSONDecodeError, ValueError, TypeError) as e:
             return f"Error al enviar a Word: {str(e)}"
 
@@ -1028,15 +1052,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 elif isinstance(ing, dict):
                     datos.append([ing.get('nombre', ''), str(ing.get('cantidad', '')), ing.get('unidad', '')])
 
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="excel",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"datos": datos, "insertar_en": "A1"},
-                requiere_hitl=False
-            ))
-            return f"Receta '{receta['nombre']}' enviada a Excel: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": f"Receta '{receta['nombre']}' lista para enviar a Excel"}
         except (sqlite3.Error, json.JSONDecodeError, ValueError, TypeError) as e:
             return f"Error al enviar a Excel: {str(e)}"
 
@@ -1066,15 +1089,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 return "No se encontraron recetas"
 
             contenido = "\n".join(lineas_menu)
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="powerpoint",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"contenido": contenido, "formato": {"titulo": "Menú del Día"}},
-                requiere_hitl=False
-            ))
-            return f"Menú enviado a PowerPoint: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": "Menú listo para enviar a PowerPoint"}
         except (sqlite3.Error, json.JSONDecodeError, ValueError, TypeError) as e:
             return f"Error al enviar menú a PowerPoint: {str(e)}"
 
@@ -1155,15 +1177,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 lineas.append("No hay ingredientes para mostrar.")
             
             contenido = "\n".join(lineas)
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="word",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"contenido": contenido, "formato": {"titulo": "Lista de Compras", "font_size": 12}},
-                requiere_hitl=False
-            ))
-            return f"Lista de compras enviada a Word: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": "Lista de compras lista para enviar a Word"}
         except (sqlite3.Error, json.JSONDecodeError, ValueError, TypeError) as e:
             return f"Error al enviar lista de compras a Word: {str(e)}"
 
@@ -1238,15 +1259,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 ])
             conn2.close()
             
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="excel",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"datos": datos, "insertar_en": "A1"},
-                requiere_hitl=False
-            ))
-            return f"Lista de compras enviada a Excel: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": "Lista de compras lista para enviar a Excel"}
         except (sqlite3.Error, json.JSONDecodeError, ValueError, TypeError) as e:
             return f"Error al enviar lista de compras a Excel: {str(e)}"
 
@@ -1282,15 +1302,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 lineas.append(f"No hay mermas registradas en los últimos {dias} días.")
             
             contenido = "\n".join(lineas)
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="word",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"contenido": contenido, "formato": {"titulo": f"Reporte de Mermas ({dias} días)", "font_size": 12}},
-                requiere_hitl=False
-            ))
-            return f"Reporte de mermas enviado a Word: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": f"Reporte de mermas listo para enviar a Word"}
         except (sqlite3.Error, json.JSONDecodeError, ValueError, TypeError) as e:
             return f"Error al enviar reporte de mermas a Word: {str(e)}"
 
@@ -1327,15 +1346,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             datos.append(["RESUMEN", "", "", "", "Total Mermas:", total_mermas])
             datos.append(["", "", "", "", "Costo Total:", f"${costo_total:.2f}" if costo_total else "$0.00"])
             
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="excel",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"datos": datos, "insertar_en": "A1"},
-                requiere_hitl=False
-            ))
-            return f"Reporte de mermas enviado a Excel: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": f"Reporte de mermas listo para enviar a Excel"}
         except (sqlite3.Error, json.JSONDecodeError, ValueError, TypeError) as e:
             return f"Error al enviar reporte de mermas a Excel: {str(e)}"
 
@@ -1372,15 +1390,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 lineas.append("No hay productos en inventario.")
             
             contenido = "\n".join(lineas)
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="word",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"contenido": contenido, "formato": {"titulo": "Inventario Actual", "font_size": 12}},
-                requiere_hitl=False
-            ))
-            return f"Inventario enviado a Word: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": "Inventario listo para enviar a Word"}
         except (sqlite3.Error, json.JSONDecodeError, ValueError, TypeError) as e:
             return f"Error al enviar inventario a Word: {str(e)}"
 
@@ -1407,15 +1424,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             for row in rows:
                 datos.append([row[0], row[1], row[2], row[3]])
             
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="excel",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"datos": datos, "insertar_en": "A1"},
-                requiere_hitl=False
-            ))
-            return f"Inventario enviado a Excel: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": "Inventario listo para enviar a Excel"}
         except (ValueError, KeyError, OSError) as e:
             return f"Error al enviar inventario a Excel: {str(e)}"
 
@@ -1433,14 +1449,15 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 conn = _obtener_conexion(db)
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT c.nombre, c.categoria, i.cantidad_actual, i.unidad, i.fecha_caducidad,
-                           CAST(julianday(i.fecha_caducidad) - julianday('now') AS INTEGER) as dias_restantes
+                    SELECT c.nombre, c.categoria, i.cantidad_actual, i.unidad,
+                           COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days')) as fecha_cad,
+                           CAST(julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') AS INTEGER) as dias_restantes
                     FROM Inventario i
                     JOIN Catalogo c ON i.producto_id = c.id
                     WHERE i.cantidad_actual > 0 
-                      AND i.fecha_caducidad IS NOT NULL
-                      AND julianday(i.fecha_caducidad) - julianday('now') <= 7
-                    ORDER BY i.fecha_caducidad ASC
+                      AND (i.fecha_caducidad_fija IS NOT NULL OR c.vida_util_dias IS NOT NULL)
+                      AND julianday(COALESCE(i.fecha_caducidad_fija, date(i.fecha_ingreso, '+' || c.vida_util_dias || ' days'))) - julianday('now') <= 7
+                    ORDER BY dias_restantes ASC
                 """)
                 rows = cursor.fetchall()
                 conn.close()
@@ -1452,15 +1469,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 # Usar datos del contexto
                 datos = [contexto["columnas"]] + contexto["datos"]
             
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="excel",
                 operacion="enviar",
                 ruta_archivo="",
                 payload={"datos": datos, "insertar_en": "A1"},
-                requiere_hitl=False
-            ))
-            return f"Productos por caducar enviados a Excel: {resultado.get('mensaje', 'OK')}"
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": "Productos por caducar listos para enviar a Excel"}
         except (ValueError, KeyError, OSError) as e:
             return f"Error al enviar productos por caducar a Excel: {str(e)}"
 
@@ -1510,15 +1526,14 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             if not nombre:
                 return "Debes especificar el nombre de la plantilla"
 
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(AccionOffice(
+            accion = AccionOffice(
                 herramienta="word" if nombre.endswith((".docx", ".doc")) else "powerpoint",
                 operacion="plantilla",
                 ruta_archivo="",
                 payload={"plantilla": nombre, "datos": datos},
-                requiere_hitl=False
-            ))
-            return resultado.get("mensaje", "Plantilla aplicada")
+                requiere_hitl=True
+            )
+            return {"_hitl": True, "_accion": accion, "_mensaje": f"Plantilla '{nombre}' lista para aplicar"}
         except (ImportError, AttributeError, ValueError, KeyError) as e:
             return f"Error: {str(e)}"
 
@@ -1720,9 +1735,20 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             return f"Error: {str(e)}"
 
     def _registrar_produccion(parametros: str) -> str:
-        """Registra producción diaria y sobrantes. Input: 'fecha=2025-06-15, cocido: SOP-021=30, PLF-018=20, sobrante: arroz=4.5|kg|no, ensalada=2|kg|si, bebida=1|litro|no'
+        """Registra produccion diaria y sobrantes. Input: 'fecha=2025-06-15, cocido: SOP-021=30, PLF-018=20, sobrante: arroz=4.5|kg|no, ensalada=2|kg|si, bebida=1|litro|no'
         Formato sobrante: 'producto=cantidad|unidad|es_perecedero(si/no)'"""
         try:
+            import re
+            parametros = parametros.strip()
+            parametros = re.sub(r'\b(raciones?)\b', '', parametros, flags=re.IGNORECASE)
+            parametros = re.sub(r'\bdel\s*d[ií]a\b', '', parametros, flags=re.IGNORECASE)
+            parametros = re.sub(r'^[\s:,]+', '', parametros)
+            parametros = re.sub(r'\s*,\s*', ', ', parametros)
+            parametros = re.sub(r':\s*:\s*', ': ', parametros)
+            parametros = parametros.strip().rstrip(',').strip()
+            if parametros and not any(p in parametros.lower() for p in ["cocido:", "cocina:", "sobrante:", "fecha="]):
+                if "=" in parametros:
+                    parametros = "cocido: " + parametros
             def _parse_sobrante_item(clave: str, valor: str) -> dict:
                 partes_valor = [v.strip() for v in valor.split("|")]
                 cantidad = partes_valor[0] if len(partes_valor) > 0 else "0"
@@ -1863,24 +1889,21 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
 
             contenido_texto = "\n".join(contenido)
 
-            cliente = MCPClient()
-            resultado = cliente.ejecutar_herramienta(
-                AccionOffice(
-                    herramienta="word",
-                    operacion="enviar",
-                    ruta_archivo="",
-                    payload={
-                        "contenido": contenido_texto,
-                        "formato": {
-                            "titulo": f"Reporte Diario {fecha}",
-                            "font_size": 12,
-                            "font_name": "Calibri",
-                        },
+            accion = AccionOffice(
+                herramienta="word",
+                operacion="enviar",
+                ruta_archivo="",
+                payload={
+                    "contenido": contenido_texto,
+                    "formato": {
+                        "titulo": f"Reporte Diario {fecha}",
+                        "font_size": 12,
+                        "font_name": "Calibri",
                     },
-                    requiere_hitl=False,
-                )
+                },
+                requiere_hitl=True,
             )
-            return f"Reporte diario generado en Word: {resultado.get('mensaje', 'OK')}"
+            return {"_hitl": True, "_accion": accion, "_mensaje": f"Reporte diario '{fecha}' listo para enviar a Word"}
         except (
             ImportError,
             KeyError,
@@ -2007,16 +2030,17 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
     def _registrar_trabajador(parametros: str) -> str:
         """Registra un trabajador.
         Input: 'ID, nombre, cargo, turno,
-        hora_entrada, hora_salida, dias_descanso(opcional)'
+        hora_entrada, hora_salida, dias_descanso(opcional), estado(opcional), tipo_contrato(opcional)'
         Ej: 'EMP001, Juan Perez, Cocinero,
-        matutino, 08:00, 16:00, Sabado-Domingo'"""
+        matutino, 08:00, 16:00, Sabado-Domingo, activo, fijo'"""
         try:
             partes = [p.strip() for p in parametros.split(",")]
             if len(partes) < 6:
                 return (
                     "Formato: ID, nombre, cargo, turno, "
                     "hora_entrada, hora_salida, "
-                    "dias_descanso(opcional)"
+                    "dias_descanso(opcional), estado(opcional: activo/reposo), "
+                    "tipo_contrato(opcional: fijo/temporal)"
                 )
             id_emp = partes[0]
             nombre = partes[1]
@@ -2025,6 +2049,8 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             h_entrada = partes[4]
             h_salida = partes[5]
             descanso = partes[6] if len(partes) > 6 else ""
+            estado = partes[7] if len(partes) > 7 else "activo"
+            tipo_contrato = partes[8] if len(partes) > 8 else "fijo"
             return db.registrar_trabajador(
                 id_emp,
                 nombre,
@@ -2033,6 +2059,8 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
                 h_entrada,
                 h_salida,
                 descanso,
+                estado,
+                tipo_contrato,
             )
         except sqlite3.Error as e:
             return f"Error: {str(e)}"
@@ -2041,23 +2069,45 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
         """Lista trabajadores. Input: turno (str, opcional). Ej: 'matutino'"""
         try:
             trabajadores = db.obtener_trabajadores(turno)
-            if not trabajadores:
-                return "No hay trabajadores registrados."
-            lineas = [
-                "TRABAJADORES",
-                "=" * 40,
-            ]
-            for t in trabajadores:
-                lineas.append(
-                    f"  {t['id_empleado']} - "
-                    f"{t['nombre_completo']} ({t['cargo']})"
-                )
-                lineas.append(
-                    f"    Turno: {t['turno']} | "
-                    f"{t['hora_entrada']}-{t['hora_salida']} | "
-                    f"Descanso: {t['dias_descanso'] or 'N/A'}"
-                )
-            return "\n".join(lineas)
+            if trabajadores:
+                lineas = [
+                    "TRABAJADORES",
+                    "=" * 40,
+                ]
+                for t in trabajadores:
+                    lineas.append(
+                        f"  {t['id_empleado']} - "
+                        f"{t['nombre_completo']} ({t['cargo']})"
+                    )
+                    lineas.append(
+                        f"    Turno: {t['turno']} | "
+                        f"{t['hora_entrada']}-{t['hora_salida']} | "
+                        f"Descanso: {t['dias_descanso'] or 'N/A'}"
+                    )
+                return "\n".join(lineas)
+
+            conn = _obtener_conexion(db)
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT d.nombre, t.contenido_completo
+                FROM DocumentosRAG d
+                LEFT JOIN DocumentosTexto t ON d.id = t.documento_id
+                WHERE d.tipo = 'generico' AND d.estado = 'activo'
+                AND (LOWER(d.nombre) LIKE '%trabajador%' OR LOWER(d.nombre) LIKE '%empleado%' OR LOWER(d.nombre) LIKE '%personal%')
+            """)
+            docs = cursor.fetchall()
+            conn.close()
+            if docs:
+                lineas = ["TRABAJADORES (desde documentos cargados):", "=" * 40]
+                for doc in docs:
+                    lineas.append(f"\n📄 {doc[0]}:")
+                    contenido = doc[1] or ""
+                    for linea in contenido.strip().split("\n")[:20]:
+                        if linea.strip():
+                            lineas.append(f"  {linea.strip()}")
+                return "\n".join(lineas)
+
+            return "No hay trabajadores registrados. Usa 'registrar trabajador' para agregar o carga un CSV con el boton [+]."
         except sqlite3.Error as e:
             return f"Error: {str(e)}"
 
@@ -2091,8 +2141,12 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             return f"Error: {str(e)}"
 
     def _dashboard_sobrantes(dias: str = "7") -> str:
-        """Dashboard de sobrantes por turno y día. Input: dias (int, opcional, default 7)"""
+        """Dashboard de sobrantes por turno y dia. Input: dias (int, opcional, default 7)"""
         try:
+            import re
+            if not dias.isdigit():
+                match = re.search(r'(\d+)', str(dias))
+                dias = match.group(1) if match else "7"
             d = int(dias) if dias else 7
             data = db.dashboard_sobrantes(d)
             lineas = [f"DASHBOARD DE SOBRANTES (últimos {d} días)", "=" * 50]
@@ -2144,11 +2198,60 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
             return f"Error: {str(e)}"
 
     def _exportar_dashboard_sobrantes(dias: str = "7") -> str:
-        """Exporta dashboard de sobrantes a archivo CSV para Excel. Input: dias (int, opcional, default 7)"""
+        """Exporta dashboard de sobrantes a archivo Excel con graficos. Input: dias (int, opcional, default 7)"""
         try:
+            import re
+            if not str(dias).isdigit():
+                match = re.search(r'(\d+)', str(dias))
+                dias = match.group(1) if match else "7"
             d = int(dias) if dias else 7
             filepath = db.exportar_dashboard_sobrantes_excel(d)
             return f"Dashboard exportado a Excel: {filepath}"
+        except (ImportError, Exception) as e:
+            # Fallback to openpyxl + matplotlib
+            try:
+                from data.dashboard_fallback import export_dashboard_fallback
+                filepath = export_dashboard_fallback(db.db_path, d, "sobrantes")
+                return f"Dashboard exportado a Excel (fallback): {filepath}"
+            except ImportError:
+                return f"Error: {str(e)}. Instala openpyxl y matplotlib: pip install openpyxl matplotlib"
+        except (ValueError, sqlite3.Error) as e:
+            return f"Error: {str(e)}"
+
+    def _exportar_dashboard_mermas(dias: str = "7") -> str:
+        """Exporta dashboard de mermas a archivo Excel con graficos. Input: dias (int, opcional, default 7)"""
+        try:
+            import re
+            if not str(dias).isdigit():
+                match = re.search(r'(\d+)', str(dias))
+                dias = match.group(1) if match else "7"
+            d = int(dias) if dias else 7
+            filepath = db.exportar_dashboard_mermas_excel(d)
+            return f"Dashboard de mermas exportado a Excel: {filepath}"
+        except (ImportError, Exception) as e:
+            # Fallback to openpyxl + matplotlib
+            try:
+                from data.dashboard_fallback import export_dashboard_fallback
+                filepath = export_dashboard_fallback(db.db_path, d, "mermas")
+                return f"Dashboard de mermas exportado a Excel (fallback): {filepath}"
+            except ImportError:
+                return f"Error: {str(e)}. Instala openpyxl y matplotlib: pip install openpyxl matplotlib"
+        except (ValueError, sqlite3.Error) as e:
+            return f"Error: {str(e)}"
+
+    def _exportar_dashboard_personal() -> str:
+        """Exporta dashboard de personal a archivo Excel con graficos."""
+        try:
+            filepath = db.exportar_dashboard_personal_excel()
+            return f"Dashboard de personal exportado a Excel: {filepath}"
+        except (ImportError, Exception) as e:
+            # Fallback to openpyxl + matplotlib
+            try:
+                from data.dashboard_fallback import export_dashboard_fallback
+                filepath = export_dashboard_fallback(db.db_path, tipo="personal")
+                return f"Dashboard de personal exportado a Excel (fallback): {filepath}"
+            except ImportError:
+                return f"Error: {str(e)}. Instala openpyxl y matplotlib: pip install openpyxl matplotlib"
         except (ValueError, sqlite3.Error) as e:
             return f"Error: {str(e)}"
 
@@ -2385,7 +2488,7 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
 
         # Trabajadores y Sobrantes
         Tool(name="registrar_trabajador", func=_registrar_trabajador,
-             description="Registra un trabajador. Input: 'ID, nombre, cargo, turno, hora_entrada, hora_salida, dias_descanso(opcional)'. Turnos: matutino, vespertino, nocturno, mixto"),
+             description="Registra un trabajador. Input: 'ID, nombre, cargo, turno, hora_entrada, hora_salida, dias_descanso(opcional), estado(opcional: activo/reposo), tipo_contrato(opcional: fijo/temporal)'. Turnos: matutino, vespertino, nocturno, mixto"),
         Tool(name="listar_trabajadores", func=_listar_trabajadores,
              description="Lista trabajadores. Input: turno (str, opcional). Ej: 'matutino'"),
         Tool(name="registrar_sobrante", func=_registrar_sobrante,
@@ -2394,4 +2497,8 @@ def crear_herramientas_operativas(db: DatabaseManager) -> List[Tool]:
              description="Dashboard de sobrantes por turno y día. Input: dias (int, opcional, default 7)"),
         Tool(name="exportar_dashboard_sobrantes", func=_exportar_dashboard_sobrantes,
              description="Exporta dashboard de sobrantes a CSV para Excel. Input: dias (int, opcional, default 7)"),
+        Tool(name="exportar_dashboard_mermas", func=_exportar_dashboard_mermas,
+             description="Exporta dashboard de mermas a Excel con graficos. Input: dias (int, opcional, default 7)"),
+        Tool(name="exportar_dashboard_personal", func=_exportar_dashboard_personal,
+             description="Exporta dashboard de personal a Excel con graficos. Sin parametros"),
     ]

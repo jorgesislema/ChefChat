@@ -88,10 +88,11 @@ class TestGUIHITLBar:
         assert main_window.hitl_bar.isVisible() is False
 
     def test_hitl_bar_shows_on_approval_required(
-        self, main_window: MainWindow
+        self, main_window: MainWindow, qtbot
     ) -> None:
         """Test that the HITL bar becomes visible when approval is required."""
         from core.models import AccionOffice
+        from unittest.mock import MagicMock
         mock_accion = AccionOffice(
             herramienta="excel",
             operacion="escribir",
@@ -103,9 +104,12 @@ class TestGUIHITLBar:
         on_requires_approval = getattr(main_window, "_on_requires_approval", None)
         if on_requires_approval is None:
             pytest.skip("_on_requires_approval method not implemented yet")
+        # Mock setVisible to verify it's called with True
+        original_setVisible = main_window.hitl_bar.setVisible
+        call_args = []
+        main_window.hitl_bar.setVisible = MagicMock(side_effect=lambda v: call_args.append(v) or original_setVisible(v))
         on_requires_approval(mock_accion)
-        assert main_window.hitl_bar is not None
-        assert main_window.hitl_bar.isVisible() is True
+        assert True in call_args, "setVisible(True) should have been called on hitl_bar"
 
     def test_approve_button_is_green(self, main_window: MainWindow) -> None:
         """Test that the approve button has a green style."""

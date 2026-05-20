@@ -40,7 +40,7 @@ PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
     },
     AIProvider.GEMINI: {
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
-        "default_model": "gemini-1.5-flash",
+        "default_model": "gemini-2.0-flash-exp",
     },
     AIProvider.CLAUDE: {
         "base_url": "https://api.anthropic.com/v1",
@@ -78,7 +78,7 @@ HERRAMIENTAS_DETECTABLES = {
         "descripcion": "Sin input"
     },
     "productos_por_caducar": {
-        "patrones": ["productos_por_caducar", "productos por caducar", "por caducar", "próximos a caducar", "proximos a caducar"],
+        "patrones": ["productos_por_caducar", "productos por caducar", "por caducar", "proximos a caducar", "próximos a caducar", "caduca", "caducan", "que caduca"],
         "descripcion": "Input: dias (int, opcional)"
     },
     "verificar_stock_bajo": {
@@ -138,11 +138,11 @@ HERRAMIENTAS_DETECTABLES = {
         "descripcion": "Input: 'plantilla.docx | nombre=Juan, fecha=15 Junio'"
     },
     "registrar_trabajador": {
-        "patrones": ["registrar_trabajador", "registra trabajador", "registrar empleado", "registra empleado", "nuevo trabajador", "nuevo empleado"],
-        "descripcion": "Input: 'ID, nombre, cargo, turno, hora_entrada, hora_salida, dias_descanso(opcional)'"
+        "patrones": ["registrar_trabajador", "registra trabajador", "registrar empleado", "registra empleado", "registra al empleado", "registra al trabajador", "nuevo trabajador", "nuevo empleado"],
+        "descripcion": "Input: 'id_empleado, nombre, cargo, turno, hora_inicio, hora_salida, dias_descanso, estado(activo/reposo), tipo_contrato(fijo/temporal)'"
     },
     "listar_trabajadores": {
-        "patrones": ["listar_trabajadores", "lista trabajadores", "lista empleados", "listar empleados", "ver trabajadores", "ver empleados"],
+        "patrones": ["listar_trabajadores", "lista trabajadores", "lista empleados", "listar empleados", "ver trabajadores", "ver empleados", "empleados registrados", "que empleados", "quien trabaja", "lista de empleados", "lista de trabajadores"],
         "descripcion": "Input: turno (str, opcional)"
     },
     "registrar_sobrante": {
@@ -156,6 +156,14 @@ HERRAMIENTAS_DETECTABLES = {
     "exportar_dashboard_sobrantes": {
         "patrones": ["exportar_dashboard_sobrantes", "exporta dashboard sobrantes", "exportar sobrantes a csv", "exportar sobrantes a excel"],
         "descripcion": "Input: dias (int, opcional, default 7)"
+    },
+    "exportar_dashboard_mermas": {
+        "patrones": ["exportar_dashboard_mermas", "exporta dashboard mermas", "exportar mermas a excel", "dashboard de mermas", "tablero de mermas", "graficos de mermas"],
+        "descripcion": "Input: dias (int, opcional, default 7)"
+    },
+    "exportar_dashboard_personal": {
+        "patrones": ["exportar_dashboard_personal", "exporta dashboard personal", "exportar personal a excel", "dashboard de personal", "tablero de personal", "graficos de personal", "dashboard de trabajadores", "tablero de trabajadores"],
+        "descripcion": "Sin parametros"
     },
     "buscar_recetas_con_ingrediente": {
         "patrones": ["buscar_recetas_con_ingrediente", "recetas con", "receta con", "buscar recetas con ingrediente", "busca recetas con"],
@@ -210,6 +218,7 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         streaming_callback: Optional[Callable[[str], None]] = None,
         rag_only: bool = True,
         db_manager=None,  # For telemetry logging
+        use_dspy: bool = False,  # Enable DSPy optimization
     ) -> None:
         self.provider = provider or ConfigManager.get_configured_provider() or AIProvider.OPENAI
         
@@ -242,12 +251,24 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         self.streaming_callback = streaming_callback
         self.rag_only = rag_only
         self.db_manager = db_manager  # For telemetry
-        self.multiagent = None  # Se inicializa después con las herramientas
+        self.use_dspy = use_dspy
+        self.dspy_optimizer = None
+        self.multiagent = None  # Se inicializa despues con las herramientas
         logging.info(f"Initializing LLM with provider={self.provider.value}, model={self.model_name}")
         self._setup_llm()
         self.tools: List[Tool] = []
         self._setup_tools()
         self._setup_multiagent()
+        
+        # Initialize DSPy optimizer if enabled
+        if self.use_dspy:
+            try:
+                from prompting.dspy_optimizer import PromptOptimizer
+                self.dspy_optimizer = PromptOptimizer()
+                logging.info("DSPy optimizer initialized")
+            except ImportError:
+                logging.warning("DSPy optimizer not available, using prompts without optimization")
+                self.use_dspy = False
 
     def _setup_llm(self) -> None:
         from pydantic import SecretStr
@@ -352,7 +373,16 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         
         # Add RAG-only system prompt if enabled
         if self.rag_only:
-            messages.append(SystemMessage(content=self.RAG_ONLY_SYSTEM_PROMPT))
+            system_prompt = self.RAG_ONLY_SYSTEM_PROMPT
+            
+            # Apply DSPy optimization if enabled
+            if self.use_dspy and self.dspy_optimizer:
+                ultimo_mensaje = historial[-1]["contenido"] if historial else ""
+                task_type = self._detect_task_type(ultimo_mensaje)
+                optimized = self.dspy_optimizer.optimize_prompt(system_prompt, task_type)
+                system_prompt = optimized.optimized
+            
+            messages.append(SystemMessage(content=system_prompt))
         
         if contexto_rag:
             messages.append(
@@ -368,11 +398,18 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         output_tokens = 0
         success = True
         respuesta = ""
+        tipo_operacion = "tool_call"
         
         try:
             # Intentar usar herramientas manualmente para búsquedas de recetas
             ultimo_mensaje = historial[-1]["contenido"].lower() if historial else ""
-            
+
+            # Normalizar acentos para comparaciones de keywords (menú→menu, día→dia, etc.)
+            import unicodedata
+            def _sin_acentos(texto: str) -> str:
+                return unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode('ascii')
+            ultimo_mensaje_norm = _sin_acentos(ultimo_mensaje)
+
             # Detectar si es búsqueda de receta por ID (ej: SOP-021, PLF-003, BEB-010, SPO-036)
             match_id = re.search(r'\b((?:SPO|SOP|BEB|ENS|POS|ENT|PLF|EVT)[-_]\d{2,4})\b', ultimo_mensaje.upper())
             ids_encontrados = re.findall(r'\b((?:SPO|SOP|BEB|ENS|POS|ENT|PLF|EVT)[-_]\d{2,4})\b', ultimo_mensaje.upper())
@@ -384,7 +421,7 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
             # ============================================================
             # PRIORIDAD 1: EXPORTACIÓN GENÉRICA (a excel/word/powerpoint)
             # ============================================================
-            if any(p in ultimo_mensaje for p in ["a excel", "a word", "a powerpoint", "al excel", "al word", "a la hoja", "al documento"]):
+            if any(p in ultimo_mensaje_norm for p in ["a excel", "a word", "a powerpoint", "al excel", "al word", "a la hoja", "al documento"]):
                 from agents.orchestrator import obtener_contexto_exportacion
                 from agents.mcp_client import MCPClient
                 from core.models import AccionOffice
@@ -395,53 +432,50 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                     columnas = contexto.get("columnas", [])
                     datos = contexto.get("datos", [])
                     
-                    if "excel" in ultimo_mensaje:
+                    if "excel" in ultimo_mensaje_norm:
                         datos_completos = [columnas] + datos if columnas else datos
-                        cliente = MCPClient()
-                        resultado = cliente.ejecutar_herramienta(AccionOffice(
+                        accion = AccionOffice(
                             herramienta="excel",
                             operacion="enviar",
                             ruta_archivo="",
                             payload={"datos": datos_completos, "insertar_en": "A1"},
-                            requiere_hitl=False
-                        ))
-                        return f"✅ Datos enviados a Excel: {resultado.get('mensaje', 'OK')}"
-                    elif "word" in ultimo_mensaje:
+                            requiere_hitl=True
+                        )
+                        return {"_hitl": True, "_accion": accion, "_mensaje": "Datos listos para enviar a Excel", "_tipo": "export_excel"}
+                    elif "word" in ultimo_mensaje_norm:
                         contenido = f"# {titulo}\n\n"
                         if columnas:
                             contenido += "| " + " | ".join(columnas) + " |\n"
                             contenido += "| " + " | ".join(["---"] * len(columnas)) + " |\n"
                             for fila in datos:
                                 contenido += "| " + " | ".join(str(c) for c in fila) + " |\n"
-                        cliente = MCPClient()
-                        resultado = cliente.ejecutar_herramienta(AccionOffice(
+                        accion = AccionOffice(
                             herramienta="word",
                             operacion="enviar",
                             ruta_archivo="",
                             payload={"contenido": contenido, "formato": {"titulo": titulo, "font_size": 12}},
-                            requiere_hitl=False
-                        ))
-                        return f"✅ Datos enviados a Word: {resultado.get('mensaje', 'OK')}"
-                    elif "powerpoint" in ultimo_mensaje:
+                            requiere_hitl=True
+                        )
+                        return {"_hitl": True, "_accion": accion, "_mensaje": "Datos listos para enviar a Word", "_tipo": "export_word"}
+                    elif "powerpoint" in ultimo_mensaje_norm:
                         contenido = f"{titulo}\n\n"
                         if columnas and datos:
                             contenido += " | ".join(columnas) + "\n"
                             for fila in datos[:10]:
                                 contenido += " | ".join(str(c) for c in fila) + "\n"
-                        cliente = MCPClient()
-                        resultado = cliente.ejecutar_herramienta(AccionOffice(
+                        accion = AccionOffice(
                             herramienta="powerpoint",
                             operacion="enviar",
                             ruta_archivo="",
                             payload={"contenido": contenido, "titulo": titulo},
-                            requiere_hitl=False
-                        ))
-                        return f"✅ Datos enviados a PowerPoint: {resultado.get('mensaje', 'OK')}"
+                            requiere_hitl=True
+                        )
+                        return {"_hitl": True, "_accion": accion, "_mensaje": "Datos listos para enviar a PowerPoint", "_tipo": "export_powerpoint"}
 
             # ============================================================
             # PRIORIDAD 2: MENU SEMANAL (ANTES de menu por ingredientes)
             # ============================================================
-            if not respuesta and self.db_manager and any(p in ultimo_mensaje for p in ["menu semanal", "menu de la semana", "menu del dia", "menu de hoy", "agregar plato", "agregar receta al menu", "modificar plato", "eliminar plato", "reset menu", "resetear menu", "consultar menu", "ver menu"]):
+            if not respuesta and self.db_manager and any(p in ultimo_mensaje_norm for p in ["menu semanal", "configurar menu", "configurar_menu", "menu de la semana", "menu del dia", "menu del", "menu de hoy", "agregar plato", "agregar receta al menu", "modificar plato", "eliminar plato", "reset menu", "resetear menu", "consultar menu", "ver menu"]):
                 from agents.tools import crear_herramientas_operativas
                 tools = crear_herramientas_operativas(self.db_manager)
                 
@@ -449,12 +483,13 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 func = getattr(tool, "func", None) if tool else None
                 if callable(func):
                     respuesta = func(ultimo_mensaje)
+                    tipo_operacion = "menu_semanal"
                     logging.critical(f"MENU_SEMANAL: {respuesta[:100]}")
-
+            
             # ============================================================
             # PRIORIDAD 3: BUSCAR DOCUMENTOS (ANTES de buscar recetas)
             # ============================================================
-            if not respuesta and self.db_manager and any(p in ultimo_mensaje for p in ["busca documento", "buscar documento", "documento", "capacitacion", "capacitación", "buenas practicas", "buenas prácticas", "protocolo", "protocolos", "manual"]):
+            if not respuesta and self.db_manager and any(p in ultimo_mensaje_norm for p in ["busca documento", "buscar documento", "documento", "capacitacion", "capacitación", "buenas practicas", "buenas prácticas", "protocolo", "protocolos", "manual"]):
                 from data.rag_store import RAGStore
                 rag = RAGStore()
                 
@@ -495,6 +530,15 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                     for d in docs[:10]:
                         lineas.append(f"  - {d.get('nombre')} (tipo: {d.get('tipo')})")
                     respuesta = "\n".join(lineas)
+                    # Mostrar contenido del primer documento encontrado
+                    contenido = docs[0].get("contenido_completo") or docs[0].get("contenido_preview") or ""
+                    if contenido.strip():
+                        max_len = 3000
+                        contenido_truncado = contenido[:max_len] if len(contenido) > max_len else contenido
+                        respuesta += f"\n\n---\n{contenido_truncado}"
+                        if len(contenido) > max_len:
+                            respuesta += "\n...(contenido truncado)"
+                    tipo_operacion = "buscar_documento"
                     logging.critical(f"DOCUMENTOS: {respuesta[:100]}")
                 else:
                     respuesta = f"No se encontraron documentos con: {termino}. Usa el boton [+] para cargar documentos."
@@ -507,13 +551,15 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 tools = crear_herramientas_operativas(self.db_manager)
                 receta_id = match_id.group(1)
                 respuesta = self._procesar_mensaje_con_id(ultimo_mensaje, ids_encontrados, receta_id, tools)
+                if respuesta:
+                    tipo_operacion = "buscar_receta_id"
 
             # ============================================================
             # PRIORIDAD 5: MENU POR INGREDIENTES (solo si NO es menu semanal)
             # ============================================================
-            es_menu = any(p in ultimo_mensaje for p in ["menú", "menu", "sugiere", "sugerir", "elabora", "elaborar", "crea", "crear", "haz", "hacer", "arma", "armar", "planifica", "planificar"])
-            es_reporte = any(p in ultimo_mensaje for p in ["merma", "mermas", "informe", "reporte", "dashboard", "inventario", "caducar", "caducidad", "stock", "semanal", "semana", "documento", "capacitacion"])
-            es_menu = es_menu and not es_reporte and not any(p in ultimo_mensaje for p in ["menu semanal", "menu de la semana", "menu del dia"])
+            es_menu = any(p in ultimo_mensaje_norm for p in ["menú", "menu", "sugiere", "sugerir", "elabora", "elaborar", "crea", "crear", "haz", "hacer", "arma", "armar", "planifica", "planificar"])
+            es_reporte = any(p in ultimo_mensaje_norm for p in ["merma", "mermas", "informe", "reporte", "dashboard", "inventario", "caducar", "caducidad", "stock", "semanal", "semana", "documento", "capacitacion"])
+            es_menu = es_menu and not es_reporte and not any(p in ultimo_mensaje_norm for p in ["menu semanal", "menu de la semana", "menu del dia"])
             
             logging.critical(f"ES_MENU: {es_menu}")
             
@@ -521,11 +567,13 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 from agents.tools import crear_herramientas_operativas
                 tools = crear_herramientas_operativas(self.db_manager)
                 respuesta = self._procesar_menu_por_ingredientes(ultimo_mensaje, tools)
+                if respuesta:
+                    tipo_operacion = "menu_por_ingredientes"
 
             # ============================================================
             # PRIORIDAD 6: MERMAS (con extraccion de fecha especifica)
             # ============================================================
-            if not respuesta and self.db_manager and any(p in ultimo_mensaje for p in ["merma", "mermas", "desperdicio", "desperdicios"]):
+            if not respuesta and self.db_manager and any(p in ultimo_mensaje_norm for p in ["merma", "mermas", "desperdicio", "desperdicios"]):
                 from agents.tools import crear_herramientas_operativas
                 tools = crear_herramientas_operativas(self.db_manager)
                 
@@ -573,16 +621,19 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                     func = getattr(tool, "func", None) if tool else None
                     if callable(func):
                         respuesta = func(dias)
+                        tipo_operacion = "reporte_mermas_excel"
                 elif "word" in ultimo_mensaje:
                     tool = next((t for t in tools if t.name == "enviar_reporte_mermas_a_word"), None)
                     func = getattr(tool, "func", None) if tool else None
                     if callable(func):
                         respuesta = func(dias)
+                        tipo_operacion = "reporte_mermas_word"
                 else:
                     tool = next((t for t in tools if t.name == "reporte_mermas"), None)
                     func = getattr(tool, "func", None) if tool else None
                     if callable(func):
                         respuesta = func(dias)
+                        tipo_operacion = "reporte_mermas"
 
             # ============================================================
             # PRIORIDAD 7: BUSCAR RECETA POR NOMBRE/INGREDIENTES
@@ -591,25 +642,42 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
             if not respuesta and self.db_manager and any(k in ultimo_mensaje for k in busca_keywords):
                 from agents.tools import crear_herramientas_operativas
                 tools = crear_herramientas_operativas(self.db_manager)
-                
-                # Detectar si es busqueda por ingredientes (contiene "con")
-                if any(p in ultimo_mensaje for p in ["con ", "que tenga ", "que lleve "]):
-                    # Extraer ingredientes
+
+                # Extraer termino de busqueda quitando prefijos de comando
+                import re as _re
+                termino = ultimo_mensaje
+                prefijos_cmd = [
+                    "dame la receta", "dame la reseta", "dame receta", "dame reseta",
+                    "busca la receta", "buscar la receta", "encuentra la receta",
+                    "busca receta", "buscar receta", "busca reseta", "buscar reseta",
+                    "dame", "busca", "buscar", "receta", "reseta",
+                    "la receta", "la reseta", "encuentra",
+                ]
+                for prefix in prefijos_cmd:
+                    pattern = r'(?<![a-záéíóúüñ])' + _re.escape(prefix) + r'(?![a-záéíóúüñ])'
+                    match = _re.search(pattern, termino, _re.IGNORECASE)
+                    if match:
+                        termino = termino[match.end():].strip()
+                        break
+                for word in ["el", "la", "los", "las", "un", "una", "de", "del"]:
+                    termino = _re.sub(r'^' + _re.escape(word) + r'\b\s*', '', termino, flags=_re.IGNORECASE).strip()
+
+                # Detectar si es busqueda por ingredientes (el termino COMIENZA con "con")
+                es_ingredientes = any(termino.lower().startswith(p) for p in ["con ", "que tenga ", "que lleve ", "que incluya "])
+                if es_ingredientes:
                     ingredientes = []
                     for prefix in ["con", "que tenga", "que lleve", "que incluya"]:
-                        idx = ultimo_mensaje.find(prefix)
+                        idx = termino.lower().find(prefix)
                         if idx >= 0:
-                            texto = ultimo_mensaje[idx + len(prefix):].strip()
-                            # Limpiar palabras de comando
+                            texto = termino[idx + len(prefix):].strip()
                             for stop in ["para", "menu", "sugerir", "sugiere", "elabora", "crea", "haz"]:
-                                sidx = texto.find(stop)
+                                sidx = texto.lower().find(stop)
                                 if sidx >= 0:
                                     texto = texto[:sidx]
-                            # Limpiar articulos
                             palabras = texto.replace(",", " ").replace(" y ", " ").split()
                             ingredientes = [p.strip() for p in palabras if len(p.strip()) > 2 and p.lower() not in ["el", "la", "los", "las", "un", "una", "de", "del", "con", "que", "para", "menu"]]
                             break
-                    
+
                     if ingredientes:
                         tool = next((t for t in tools if t.name == "buscar_recetas_con_ingrediente"), None)
                         func = getattr(tool, "func", None) if tool else None
@@ -621,28 +689,58 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                                     resultados.append(res)
                             if resultados:
                                 respuesta = "\n\n".join(resultados)
+                                tipo_operacion = "buscar_receta_ingredientes"
                             else:
-                                # Intentar buscar por nombre directo
                                 resultado_busqueda = self._buscar_receta_por_nombre(ultimo_mensaje, tools, messages)
                                 respuesta = resultado_busqueda if resultado_busqueda else f"No se encontraron recetas con: {', '.join(ingredientes)}"
+                                if resultado_busqueda:
+                                    tipo_operacion = "buscar_receta_nombre"
                         else:
                             respuesta = self._buscar_receta_por_nombre(ultimo_mensaje, tools, messages)
+                            if respuesta:
+                                tipo_operacion = "buscar_receta_nombre"
                     else:
                         respuesta = self._buscar_receta_por_nombre(ultimo_mensaje, tools, messages)
+                        if respuesta:
+                            tipo_operacion = "buscar_receta_nombre"
                 else:
-                    # Buscar por nombre directo
                     respuesta = self._buscar_receta_por_nombre(ultimo_mensaje, tools, messages)
+                    if respuesta:
+                        tipo_operacion = "buscar_receta_nombre"
+
+            # ============================================================
+            # PRIORIDAD 7.5: BUSCAR RECETA POR NOMBRE (sin keywords)
+            # ============================================================
+            if not respuesta and self.db_manager:
+                es_comando = any(p in ultimo_mensaje_norm for p in [
+                    "menu", "merma", "inventario", "stock", "caducar", "trabajador",
+                    "sobrante", "produccion", "turno", "incidencia", "compra", "venta",
+                    "word", "excel", "powerpoint", "plantilla", "dashboard", "reporte",
+                    "rentabilidad", "costo", "telemetria", "configurar", "registrar",
+                    "listar", "eliminar", "reset", "agregar", "modificar", "asignar",
+                ])
+                es_pregunta = any(p in ultimo_mensaje for p in ["?", "que es", "como", "cuando", "donde", "quien", "por que", "cual"])
+                if not es_comando and not es_pregunta and len(ultimo_mensaje.strip()) > 3:
+                    from agents.tools import crear_herramientas_operativas
+                    tools = crear_herramientas_operativas(self.db_manager)
+                    resultado = self._buscar_receta_por_nombre(ultimo_mensaje, tools, messages)
+                    if resultado and "no encontr" not in resultado.lower():
+                        respuesta = resultado
+                        tipo_operacion = "buscar_receta_nombre"
 
             # ============================================================
             # PRIORIDAD 8: EJECUTAR HERRAMIENTA DETECTADA
             # ============================================================
             if not respuesta and self.db_manager:
                 respuesta = self._ejecutar_herramienta_detectada(historial)
+                if respuesta:
+                    tipo_operacion = "herramienta_detectada"
             
             # ============================================================
             # PRIORIDAD 9: LLM DIRECTO
             # ============================================================
             if not respuesta:
+                tipo_operacion = "chat_completion"
                 respuesta = self.llm.invoke(messages)
                 
                 logging.critical(f"LLM RESPONSE TYPE: {type(respuesta)}")
@@ -654,152 +752,33 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                     
                     if "token_usage" in metadata:
                         usage = metadata["token_usage"]
-                        input_tokens = usage.get("prompt_tokens", 0)
-                        output_tokens = usage.get("completion_tokens", 0)
+                        input_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
+                        output_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
                         logging.critical(f"TOKENS (token_usage): input={input_tokens}, output={output_tokens}")
                     elif "usage" in metadata:
                         usage = metadata["usage"]
-                        input_tokens = usage.get("prompt_tokens", 0)
-                        output_tokens = usage.get("completion_tokens", 0)
+                        input_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
+                        output_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
                         logging.critical(f"TOKENS (usage): input={input_tokens}, output={output_tokens}")
                     elif "usage_metadata" in metadata:
                         usage = metadata["usage_metadata"]
-                        input_tokens = usage.get("input_tokens", 0)
-                        output_tokens = usage.get("output_tokens", 0)
+                        input_tokens = usage.get("input_tokens", 0) or usage.get("prompt_tokens", 0)
+                        output_tokens = usage.get("output_tokens", 0) or usage.get("completion_tokens", 0)
                         logging.critical(f"TOKENS (usage_metadata): input={input_tokens}, output={output_tokens}")
                     else:
                         logging.critical(f"NO TOKEN USAGE FOUND IN METADATA")
                 elif hasattr(respuesta, "usage_metadata"):
                     usage = respuesta.usage_metadata
                     if usage:
-                        input_tokens = usage.get("input_tokens", 0)
-                        output_tokens = usage.get("output_tokens", 0)
+                        input_tokens = usage.get("input_tokens", 0) or usage.get("prompt_tokens", 0)
+                        output_tokens = usage.get("output_tokens", 0) or usage.get("completion_tokens", 0)
                         logging.critical(f"TOKENS (usage_metadata attr): input={input_tokens}, output={output_tokens}")
-                else:
-                    logging.critical(f"NO response_metadata ATTRIBUTE")
-                
-                respuesta = str(respuesta.content) if hasattr(respuesta, "content") else str(respuesta)
-            
-            # ============================================================
-            # GUARDAR CONTEXTO PARA EXPORTACIÓN
-            # ============================================================
-            if respuesta:
-                from agents.orchestrator import guardar_contexto_exportacion
-                guardar_contexto_exportacion(
-                    datos=[[respuesta]],
-                    columnas=["Respuesta"],
-                    titulo="Respuesta ChefChat"
-                )
-            
-            # DETECCIÓN DE MENU SEMANAL
-            if not respuesta and self.db_manager and any(p in ultimo_mensaje for p in ["menu semanal", "menu de la semana", "menu del", "agregar plato", "agregar receta al menu", "buscar receta para menu", "modificar plato", "eliminar plato", "reset menu", "resetear menu"]):
-                from agents.tools import crear_herramientas_operativas
-                tools = crear_herramientas_operativas(self.db_manager)
-                
-                # Consultar menu
-                if any(p in ultimo_mensaje for p in ["menu semanal", "menu de la semana", "menu del", "que hay", "precios", "preparacion"]):
-                    tool = next((t for t in tools if t.name == "consultar_menu_semanal"), None)
-                    func = getattr(tool, "func", None) if tool else None
-                    if callable(func):
-                        respuesta = func(ultimo_mensaje)
-                # Agregar plato
-                elif "agregar plato" in ultimo_mensaje:
-                    tool = next((t for t in tools if t.name == "agregar_plato_menu"), None)
-                    func = getattr(tool, "func", None) if tool else None
-                    if callable(func):
-                        for prefix in ["agregar plato", "agrega plato"]:
-                            idx = ultimo_mensaje.find(prefix)
-                            if idx >= 0:
-                                params = ultimo_mensaje[idx + len(prefix):].strip()
-                                respuesta = func(params)
-                                break
-                # Agregar receta
-                elif "agregar receta" in ultimo_mensaje:
-                    tool = next((t for t in tools if t.name == "agregar_receta_al_menu"), None)
-                    func = getattr(tool, "func", None) if tool else None
-                    if callable(func):
-                        for prefix in ["agregar receta al menu", "agrega receta"]:
-                            idx = ultimo_mensaje.find(prefix)
-                            if idx >= 0:
-                                params = ultimo_mensaje[idx + len(prefix):].strip()
-                                respuesta = func(params)
-                                break
-                # Buscar recetas
-                elif "buscar receta" in ultimo_mensaje and "menu" in ultimo_mensaje:
-                    tool = next((t for t in tools if t.name == "buscar_recetas_para_menu"), None)
-                    func = getattr(tool, "func", None) if tool else None
-                    if callable(func):
-                        for prefix in ["buscar receta para menu", "busca receta"]:
-                            idx = ultimo_mensaje.find(prefix)
-                            if idx >= 0:
-                                params = ultimo_mensaje[idx + len(prefix):].strip()
-                                respuesta = func(params)
-                                break
-                # Modificar
-                elif "modificar" in ultimo_mensaje:
-                    tool = next((t for t in tools if t.name == "modificar_plato_menu"), None)
-                    func = getattr(tool, "func", None) if tool else None
-                    if callable(func):
-                        for prefix in ["modificar plato", "modifica"]:
-                            idx = ultimo_mensaje.find(prefix)
-                            if idx >= 0:
-                                params = ultimo_mensaje[idx + len(prefix):].strip()
-                                respuesta = func(params)
-                                break
-                # Eliminar
-                elif "eliminar" in ultimo_mensaje or "quitar" in ultimo_mensaje:
-                    tool = next((t for t in tools if t.name == "eliminar_plato_menu"), None)
-                    func = getattr(tool, "func", None) if tool else None
-                    if callable(func):
-                        import re
-                        match = re.search(r'(\d+)', ultimo_mensaje)
-                        if match:
-                            respuesta = func(match.group(1))
-                # Reset
-                elif "reset" in ultimo_mensaje or "resetear" in ultimo_mensaje:
-                    tool = next((t for t in tools if t.name == "reset_menu_semanal"), None)
-                    func = getattr(tool, "func", None) if tool else None
-                    if callable(func):
-                        respuesta = func()
-            
-            if not respuesta and self.db_manager:
-                respuesta = self._ejecutar_herramienta_detectada(historial)
-            
-            # Si no hay respuesta de herramienta, usar LLM directo
-            if not respuesta:
-                respuesta = self.llm.invoke(messages)
-                
-                # Extract usage from response - CRITICAL DEBUG
-                logging.critical(f"LLM RESPONSE TYPE: {type(respuesta)}")
-                
-                if hasattr(respuesta, "response_metadata"):
-                    metadata = respuesta.response_metadata
-                    logging.critical(f"META KEYS: {metadata.keys() if hasattr(metadata, 'keys') else 'N/A'}")
-                    logging.critical(f"META: {str(metadata)[:500]}")
-                    
-                    if "token_usage" in metadata:
-                        usage = metadata["token_usage"]
-                        input_tokens = usage.get("prompt_tokens", 0)
-                        output_tokens = usage.get("completion_tokens", 0)
-                        logging.critical(f"TOKENS (token_usage): input={input_tokens}, output={output_tokens}")
-                    elif "usage" in metadata:
-                        usage = metadata["usage"]
-                        input_tokens = usage.get("prompt_tokens", 0)
-                        output_tokens = usage.get("completion_tokens", 0)
-                        logging.critical(f"TOKENS (usage): input={input_tokens}, output={output_tokens}")
-                    elif "usage_metadata" in metadata:
-                        usage = metadata["usage_metadata"]
-                        input_tokens = usage.get("input_tokens", 0)
-                        output_tokens = usage.get("output_tokens", 0)
-                        logging.critical(f"TOKENS (usage_metadata): input={input_tokens}, output={output_tokens}")
-                    else:
-                        logging.critical(f"NO TOKEN USAGE FOUND IN METADATA")
-                elif hasattr(respuesta, "usage_metadata"):
-                    usage = respuesta.usage_metadata
+                elif hasattr(respuesta, "usage"):
+                    usage = respuesta.usage
                     if usage:
-                        input_tokens = usage.get("input_tokens", 0)
-                        output_tokens = usage.get("output_tokens", 0)
-                        logging.critical(f"TOKENS (usage_metadata attr): input={input_tokens}, output={output_tokens}")
+                        input_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
+                        output_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
+                        logging.critical(f"TOKENS (usage attr): input={input_tokens}, output={output_tokens}")
                 else:
                     logging.critical(f"NO response_metadata ATTRIBUTE")
                 
@@ -828,7 +807,7 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     costo_usd=costo_usd,
-                    operacion="chat_completion",
+                    operacion=tipo_operacion,
                     duracion=duration,
                     exito=success
                 )
@@ -838,6 +817,10 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 # exceptions likely to be raised by telemetry/database ops.
                 logging.critical(f"TELEMETRY ERROR: {e}")
                 pass
+        
+        # Detect HITL action from tool results
+        if isinstance(respuesta, dict) and respuesta.get("_hitl"):
+            return respuesta
         
         return respuesta
 
@@ -849,9 +832,14 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         tools: List[Tool],
     ) -> str:
         import re
+        import unicodedata
+
+        def _sin_acentos(texto: str) -> str:
+            return unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode('ascii')
+        ultimo_mensaje_norm = _sin_acentos(ultimo_mensaje)
 
         def _ejecutar_tool(tool, *args) -> Optional[str]:
-            """Ejecuta la función de la tool y devuelve str o None."""
+            """Ejecuta la función de la tool y devuelve str o None. Detecta HITL actions."""
             if tool is None:
                 return None
             func = getattr(tool, "func", None)
@@ -860,18 +848,25 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                     res = func(*args)
                 except (AttributeError, RuntimeError, ValueError, OSError):
                     return None
-                return None if res is None else str(res)
+                if res is None:
+                    return None
+                if isinstance(res, dict) and res.get("_hitl"):
+                    return res
+                return str(res)
             return None
 
         def _call_func(func, *args) -> Optional[str]:
-            """Llama directamente a una función (posiblemente obtenida por getattr)
-            y devuelve su resultado como str o None."""
+            """Llama directamente a una función y devuelve su resultado como str o None. Detecta HITL actions."""
             if not callable(func):
                 return None
             try:
                 res = func(*args)
             except (AttributeError, RuntimeError, ValueError, OSError):
                 return None
+            if res is None:
+                return None
+            if isinstance(res, dict) and res.get("_hitl"):
+                return res
             return None if res is None else str(res)
 
         respuesta = ""
@@ -971,44 +966,62 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         
         # PRIORIDAD 2: Verificar inventario (sin export)
         inventario_keywords = [
-            "elaborar",
-            "ingrediente",
-            "ingredientes",
-            "nesecita",
-            "nesecitamos",
+            "elaborar", "ingrediente", "ingredientes",
+            "nesecita", "nesecitamos", "necesita", "necesitamos", "necesito",
+            "falta", "faltan", "faltante", "faltantes",
+            "bodega", "almacen", "inventario", "inventarios",
+            "revisa", "revisar", "revision", "verificar",
+            "comprar", "compra", "compras", "stock",
+            "lista compras", "lista de compras", "genera lista", "generar lista",
+            "produccion", "registrar produccion",
+            "planifica", "planificar", "evento", "planificacion",
         ]
-        if any(p in ultimo_mensaje for p in inventario_keywords):
+        if any(p in ultimo_mensaje_norm for p in inventario_keywords):
             recetas_str = ";".join(ids_encontrados)
-            if len(ids_encontrados) >= 2:
-                plan_tool = next(
-                    (t for t in tools if t.name == "planificar_evento"),
-                    None,
-                )
-                resultado = _ejecutar_tool(
-                    plan_tool,
-                    f"recetas={recetas_str} | comensales=1",
-                )
+            comensales = 1
+            match_pers = re.search(r'para\s+(\d+)\s*(?:personas?|comensales|pax)', ultimo_mensaje_norm)
+            if match_pers:
+                comensales = int(match_pers.group(1))
+
+            es_lista_compras = any(p in ultimo_mensaje_norm for p in ["lista compras", "lista de compras", "genera lista", "generar lista"])
+            es_produccion = any(p in ultimo_mensaje_norm for p in ["produccion", "producción", "registrar produccion"])
+
+            if es_lista_compras:
+                lista_tool = next((t for t in tools if t.name == "generar_lista_compras"), None)
+                resultado = _ejecutar_tool(lista_tool, recetas_str, comensales)
                 if resultado is not None:
+                    if isinstance(resultado, dict) and resultado.get("_hitl"):
+                        return resultado
                     resultado_str = str(resultado)
-                    respuesta = (
-                        resultado_str
-                        if "error" not in resultado_str.lower()
-                        else f"❌ {resultado_str}"
-                    )
+                    respuesta = resultado_str if "error" not in resultado_str.lower() else f"❌ {resultado_str}"
+            elif es_produccion:
+                prod_tool = next((t for t in tools if t.name == "registrar_produccion"), None)
+                resultado = _ejecutar_tool(prod_tool, ultimo_mensaje)
+                if resultado is not None:
+                    if isinstance(resultado, dict) and resultado.get("_hitl"):
+                        return resultado
+                    resultado_str = str(resultado)
+                    respuesta = resultado_str if "error" not in resultado_str.lower() else f"❌ {resultado_str}"
+            elif len(ids_encontrados) >= 2:
+                plan_tool = next((t for t in tools if t.name == "planificar_evento"), None)
+                resultado = _ejecutar_tool(plan_tool, f"recetas={recetas_str} | comensales={comensales}")
+                if resultado is not None:
+                    if isinstance(resultado, dict) and resultado.get("_hitl"):
+                        return resultado
+                    resultado_str = str(resultado)
+                    respuesta = resultado_str if "error" not in resultado_str.lower() else f"❌ {resultado_str}"
             elif len(ids_encontrados) == 1:
-                lista_tool = next(
-                    (t for t in tools if t.name == "generar_lista_compras"),
-                    None,
-                )
-                resultado = _ejecutar_tool(lista_tool, recetas_str, 1)
+                lista_tool = next((t for t in tools if t.name == "generar_lista_compras"), None)
+                resultado = _ejecutar_tool(lista_tool, recetas_str, comensales)
                 if resultado is not None:
+                    if isinstance(resultado, dict) and resultado.get("_hitl"):
+                        return resultado
                     resultado_str = str(resultado)
-                    respuesta = (
-                        resultado_str
-                        if "error" not in resultado_str.lower()
-                        else f"❌ {resultado_str}"
-                    )
+                    respuesta = resultado_str if "error" not in resultado_str.lower() else f"❌ {resultado_str}"
             if respuesta:
+                # Detect HITL action
+                if isinstance(respuesta, dict) and respuesta.get("_hitl"):
+                    return respuesta
                 return respuesta
 
         if any(
@@ -1076,12 +1089,12 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                     if res is not None:
                         return res
             # Inventario/Bodega
-            elif any(p in ultimo_mensaje for p in ["inventario", "bodega", "stock"]):
+            elif any(p in ultimo_mensaje_norm for p in ["inventario", "bodega", "stock"]):
                 # Productos por caducar
-                if any(p in ultimo_mensaje for p in ["caducar", "caducidad", "vencer", "vencimiento"]):
-                    if "excel" in ultimo_mensaje or "word" in ultimo_mensaje or "powerpoint" in ultimo_mensaje:
+                if any(p in ultimo_mensaje_norm for p in ["caducar", "caducidad", "vencer", "vencimiento"]):
+                    if "excel" in ultimo_mensaje_norm or "word" in ultimo_mensaje_norm or "powerpoint" in ultimo_mensaje_norm:
                         # Exportar directamente
-                        if "excel" in ultimo_mensaje:
+                        if "excel" in ultimo_mensaje_norm:
                             tool = next(
                                 (t for t in tools if t.name == "enviar_productos_por_caducar_a_excel"),
                                 None,
@@ -1215,15 +1228,14 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         generic_words = {"platos", "plato", "comida", "comidas", "algo", "todo", "cualquier", 
                         "lo", "que", "haya", "disponible", "menu", "menú", "dia", "día"}
         # Tipos de platos/categorías que NO son ingredientes específicos (incluye errores comunes)
-        tipo_plato_words = {"postre", "postres", "pstre", "pstres",  # postre con typos
-                           "bebida", "bebidas", "bebida", "trago", "tragos",
+        tipo_plato_words = {"postre", "postres", "pstre", "pstres",
+                           "bebida", "bebidas", "trago", "tragos",
                            "entrante", "entrantes", "entrada", "entradas",
                            "sopa", "sopas", "crema", "caldos", "caldo",
                            "fuerte", "principal", "principales",
-                           "plato", "platos", "plato", "plta", "pltos", "plats",  # platos con typos
-                           "guarnición", "guarnicion", "guarniciones", "acompañante", "acompanante",
-                           "ensalada", "ensaladas", "ensalada", "ensalada",
-                           "carne", "carnes", "pollo", "pollos", "res", "cerdo", "pescado", "pescados",
+                           "plato", "platos", "plta", "pltos", "plats",
+                           "guarnicion", "guarniciones", "acompanante",
+                           "ensalada", "ensaladas",
                            "mariscos", "marisco", "aves", "ave"}
         
         # Estrategia 1: Buscar después de prefijos como "con", "que tenga", etc.
@@ -1328,6 +1340,8 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         tools: List[Tool],
         messages: List[BaseMessage],
     ) -> str:
+        import re
+
         buscar_tool = next((t for t in tools if t.name == "buscar_receta"), None)
         if not buscar_tool:
             return ""
@@ -1337,33 +1351,40 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
 
         # Extraer el nombre de la receta limpiando palabras de comando
         consulta = ultimo_mensaje
-        for prefix in [
+        prefijos = [
             "dame la receta",
             "dame la reseta",
             "dame receta",
+            "dame reseta",
             "busca la receta",
             "buscar la receta",
             "encuentra la receta",
             "busca receta",
             "buscar receta",
+            "busca reseta",
+            "buscar reseta",
             "dame",
             "busca",
             "buscar",
             "receta",
             "reseta",
             "la receta",
+            "la reseta",
             "encuentra",
-        ]:
-            idx = ultimo_mensaje.find(prefix)
-            if idx >= 0:
-                consulta = ultimo_mensaje[idx + len(prefix):].strip()
+        ]
+        for prefix in prefijos:
+            # Use word boundary match to avoid partial matches like "busca" in "buscar"
+            pattern = r'(?<![a-záéíóúüñ])' + re.escape(prefix) + r'(?![a-záéíóúüñ])'
+            match = re.search(pattern, ultimo_mensaje, re.IGNORECASE)
+            if match:
+                consulta = ultimo_mensaje[match.end():].strip()
                 break
-        
+
         # Limpiar artículos y preposiciones del inicio
         for word in ["el", "la", "los", "las", "un", "una", "de", "del", "con", "que", "sea"]:
-            if consulta.lower().startswith(word + " "):
-                consulta = consulta[len(word):].strip()
-        
+            pattern = r'^' + re.escape(word) + r'\b\s*'
+            consulta = re.sub(pattern, '', consulta, flags=re.IGNORECASE).strip()
+
         # Si la consulta está vacía o es muy corta, no buscar
         if not consulta or len(consulta) < 3:
             return ""
@@ -1378,16 +1399,20 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
         return f"❌ {resultado_str}"
 
     def _ejecutar_herramienta_detectada(self, historial: List[Dict[str, str]]) -> str:
+        import unicodedata
+        def _sin_acentos(texto: str) -> str:
+            return unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode('ascii')
         ultimo_mensaje = historial[-1]["contenido"].lower() if historial else ""
         if not self.db_manager or not ultimo_mensaje:
             return ""
+        ultimo_mensaje_norm = _sin_acentos(ultimo_mensaje)
 
         from agents.tools import crear_herramientas_operativas
         tools = crear_herramientas_operativas(self.db_manager)
 
         for nombre, info in HERRAMIENTAS_DETECTABLES.items():
             for patron in info["patrones"]:
-                idx = ultimo_mensaje.find(patron)
+                idx = ultimo_mensaje_norm.find(_sin_acentos(patron))
                 if idx < 0:
                     continue
 
@@ -1398,7 +1423,7 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
                 if not callable(func):
                     continue
 
-                parametros = ultimo_mensaje[idx + len(patron):].strip()
+                parametros = ultimo_mensaje_norm[idx + len(_sin_acentos(patron)):].strip()
                 # Ejecutar la herramienta y asegurar que devolvemos un str
                 try:
                     if parametros:
@@ -1481,6 +1506,43 @@ Si el usuario solicita una receta no encontrada, sugiere usar el botón [+] para
             return json.loads(text)
         except json.JSONDecodeError:
             return {"error": "No se pudo parsear la respuesta como JSON", "raw": text}
+
+    def _detect_task_type(self, mensaje: str) -> str:
+        """Detect the type of task based on user message."""
+        mensaje_lower = mensaje.lower()
+        
+        # Recipe-related tasks
+        recipe_keywords = ["receta", "recipe", "preparar", "cocinar", "ingredientes", "plato"]
+        if any(kw in mensaje_lower for kw in recipe_keywords):
+            return "recipe"
+        
+        # Inventory-related tasks
+        inventory_keywords = ["inventario", "stock", "producto", "caducidad", "lote"]
+        if any(kw in mensaje_lower for kw in inventory_keywords):
+            return "inventory"
+        
+        # Menu-related tasks
+        menu_keywords = ["menu", "semanal", "comida", "desayuno", "almuerzo", "cena"]
+        if any(kw in mensaje_lower for kw in menu_keywords):
+            return "menu"
+        
+        # Waste-related tasks
+        waste_keywords = ["merma", "desperdicio", "sobrante", "residuo"]
+        if any(kw in mensaje_lower for kw in waste_keywords):
+            return "waste"
+        
+        # Sales-related tasks
+        sales_keywords = ["venta", "ventas", "ingreso", "ganancia", "rentabilidad"]
+        if any(kw in mensaje_lower for kw in sales_keywords):
+            return "sales"
+        
+        # Dashboard-related tasks
+        dashboard_keywords = ["dashboard", "reporte", "grafico", "estadistica"]
+        if any(kw in mensaje_lower for kw in dashboard_keywords):
+            return "dashboard"
+        
+        # Default: general task
+        return "general"
 
     def get_provider_display_name(self) -> str:
         return ConfigManager.get_provider_display_name(self.provider)

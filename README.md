@@ -1,4 +1,4 @@
-# ChefChat Pro 🍳
+# ChefChat Pro
 
 Asistente de escritorio con IA para gestion integral de restaurantes. Combina agentes especializados, RAG, proteccion contra inyeccion de prompts e integracion con Microsoft Office con aprobacion humana en el ciclo (HITL).
 
@@ -8,10 +8,13 @@ Asistente de escritorio con IA para gestion integral de restaurantes. Combina ag
 - **Sistema Multiagente**: Planner + Executor con 5 agentes especializados para tareas complejas
 - **Guardrails**: Proteccion contra inyeccion de prompts con 23 patrones de deteccion, validacion de entrada, rate limiting y filtrado de contenido
 - **RAG**: Busqueda de documentos y recetas con expansion de consultas y sinonimos culinarios
-- **Proveedores de IA**: OpenRouter, Azure OpenAI, Ollama (local gratuito)
-- **HITL**: Aprobacion humana obligatoria para acciones criticas en Word/Excel
+- **Proveedores de IA**: OpenRouter, Azure OpenAI, Ollama (local gratuito), Gemini
+- **HITL**: Aprobacion humana obligatoria para acciones criticas en Word/Excel/PowerPoint
 - **Telemetria**: Registro de metricas y rendimiento con exportacion CSV/JSON
 - **DSPy Optimizer**: Optimizacion de prompts con few-shot examples y feedback de relevancia
+- **Dashboards Profesionales**: Exportacion a Excel con graficos (COM o fallback openpyxl/matplotlib)
+- **Configuracion .env**: Soporte para variables de entorno para configuracion flexible
+- **Inyeccion de Dependencias**: Container DI para mejor testabilidad
 
 ## Estructura del Proyecto
 
@@ -20,6 +23,7 @@ ChefChat/
 ├── main.py                    # Punto de entrada
 ├── requirements.txt           # Dependencias
 ├── chefchat.db                # Base de datos SQLite
+├── .env.example               # Plantilla de configuracion
 ├── .gitignore                 # Archivos excluidos de git
 │
 ├── agents/                    # Agentes de IA
@@ -31,11 +35,15 @@ ChefChat/
 ├── core/                      # Componentes centrales
 │   ├── config.py              # Configuracion y proveedores AI
 │   ├── models.py              # Modelos Pydantic
-│   └── rag_classifier.py      # Clasificador RAG
+│   ├── rag_classifier.py      # Clasificador RAG
+│   ├── tool_contracts.py      # Contratos Pydantic para herramientas
+│   └── di_container.py        # Inyeccion de dependencias
 │
 ├── data/                      # Gestion de datos
 │   ├── db_manager.py          # Gestor de base de datos
 │   ├── rag_store.py           # Almacen RAG
+│   ├── semantic_rag.py        # Busqueda semantica con FAISS
+│   ├── dashboard_fallback.py  # Fallback para dashboards sin COM
 │   └── menu_semanal.py        # CRUD MenuSemanalPro
 │
 ├── data_source/               # Fuentes de datos externas
@@ -100,6 +108,10 @@ python -m venv .venv
 
 # Instalar dependencias
 pip install -r requirements.txt
+
+# Copiar configuracion
+copy .env.example .env
+# Editar .env con tus valores
 ```
 
 ## Uso
@@ -122,28 +134,32 @@ python scripts/security_scan.py
 
 ### OpenRouter (Principal)
 1. Obtener API key en https://openrouter.ai
-2. Configurar en la aplicacion (boton de llave)
+2. Configurar en la aplicacion (boton de llave) o en `.env`
 
 ### Ollama (Local Gratuito)
 1. Instalar Ollama desde https://ollama.ai
 2. Descargar modelo: `ollama pull llama3.2`
-3. Seleccionar Ollama en la aplicacion
+3. Seleccionar Ollama en la aplicacion o configurar `CHEFCHAT_AI_PROVIDER=ollama` en `.env`
 
 ### Azure OpenAI (Enterprise)
 1. Crear recurso en Azure Portal
-2. Configurar endpoint y API key
+2. Configurar endpoint y API key en `.env`
 3. Seleccionar en la aplicacion
+
+### Google Gemini
+1. Obtener API key en https://ai.google.dev
+2. Configurar `CHEFCHAT_GEMINI_API_KEY` en `.env`
 
 ## Arquitectura
 
 ### Patron Principal
-Clean Architecture + MVC + Orquestador de Agentes
+Clean Architecture + MVC + Orquestador de Agentes + Inyeccion de Dependencias
 
 ### Flujo de Procesamiento
 1. Usuario envia peticion en GUI
 2. Guardrails valida la entrada
 3. Orchestrator clasifica intencion y detecta prioridad
-4. DSPy Optimizer expande y optimiza prompt
+4. DSPy Optimizer expande y optimiza prompt (si esta habilitado)
 5. Routing a agente especializado o sistema multiagente
 6. Respuesta formateada y enviada a GUI
 7. Telemetria registrada
@@ -154,16 +170,18 @@ Clean Architecture + MVC + Orquestador de Agentes
 - **Agentes**: Recipe, Inventory, Menu, Waste, Document
 
 ### HITL (Human-in-the-Loop)
-- Aprobacion obligatoria para acciones criticas en Word/Excel
+- Aprobacion obligatoria para acciones criticas en Word/Excel/PowerPoint
 - QThread se pausa con `event.wait()` hasta aprobacion
 - Preview en panel derecho de GUI
+- Botones Aprobar/Rechazar con estilos visuales
 
 ## Seguridad
 
-- API Keys almacenadas en keyring del SO
+- API Keys almacenadas en keyring del SO o variables de entorno
 - Guardrails intercepta prompts maliciosos
 - Sandbox para pruebas MCP
 - Zero credenciales en codigo
+- Contratos Pydantic para validacion estricta de entrada/salida
 
 ## Pruebas
 
@@ -178,8 +196,8 @@ python -m pytest tests/test_mcp.py -v
 ```
 
 ### Resultados Actuales
-- **78 tests pasan**, 4 skipped, 2 errors (autenticacion externa)
-- Cobertura: Guardrails (10), Ollama (4), DSPy (8), Multiagent (13), Integracion (3)
+- **79 tests pasan**, 3 skipped, 2 errors (aislamiento Qt en ejecucion masiva)
+- Cobertura: Guardrails (10), Ollama (4), DSPy (8), Multiagent (13), Integracion (3), GUI (13), MCP (6), Modelos (12), Worker (5)
 
 ## Documentacion
 
@@ -191,25 +209,24 @@ python -m pytest tests/test_mcp.py -v
 ## Limitaciones Conocidas
 
 ### RAG
-- Usa SQLite `LIKE` para busqueda por keywords
-- No usa embeddings semanticos → falla en consultas semanticas
-- **Mejora pendiente**: Implementar FAISS/Chroma + sentence-transformers
+- Busqueda principal usa SQLite `LIKE` para keywords
+- Busqueda semantica con FAISS disponible pero requiere `sentence-transformers`
+- **Recomendacion**: Instalar `pip install faiss-cpu sentence-transformers` para busqueda semantica completa
 
 ### HITL
-- Flag `requiere_hitl` existe pero UI de aprobacion inactiva
-- **Mejora pendiente**: Implementar UI de aprobacion y cola pendiente
+- UI de aprobacion implementada y funcional
+- Requiere que el worker este en modo de espera para aprobacion
 
 ## Proximos Pasos
 
-1. Implementar embeddings reales para RAG
-2. Implementar UI de aprobacion HITL con cola pendiente
-3. Agregar contratos Pydantic para validacion estricta
-4. Soporte .env para configuracion flexible
-5. GitHub Secret Scanning + Dependabot
+1. Implementar pipeline de evaluacion continua
+2. Agregar GitHub Actions CI/CD workflow
+3. Patrones de error boundary para degradacion graceful
+4. GitHub Secret Scanning + Dependabot
 
 ## Licencia
 
-Propietario - ChefChat Pro v1.0
+MIT License - Ver archivo [LICENSE](LICENSE) para mas detalles.
 
 ---
 

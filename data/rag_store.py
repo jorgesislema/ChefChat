@@ -604,7 +604,7 @@ class RAGStore:
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT d.*, t.palabras_clave
+                SELECT d.*, t.palabras_clave, t.contenido_completo
                 FROM DocumentosRAG d
                 LEFT JOIN DocumentosTexto t ON d.id = t.documento_id
                 WHERE d.estado = 'activo'

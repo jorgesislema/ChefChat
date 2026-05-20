@@ -237,7 +237,7 @@ class MenuSemanalManager:
             return self._formatear_menu_completo(menu)
 
     def _formatear_dia(self, dia: str, menu: List[Dict]) -> str:
-        platos_dia = [p for p in menu if p['Dia_Semana'] == dia]
+        platos_dia = [p for p in menu if p['Dia_Semana'].lower() == dia.lower()]
         if not platos_dia:
             return f"No hay menu configurado para el {dia}."
         lineas = [f"📋 **MENU DEL {dia.upper()}**", "=" * 40]

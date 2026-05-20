@@ -100,7 +100,7 @@ class RecipeAgent(BaseAgent):
 
     def __init__(self, tools: List[Any] = None):
         super().__init__(AgentRole.RECIPE, tools)
-        self.keywords = ["receta", "reseta", "cocinar", "preparar", "ingredientes", "plato"]
+        self.keywords = ["receta", "reseta", "cocinar", "preparar", "ingredientes", "plato", "encuentra"]
 
     def can_handle(self, query: str) -> bool:
         query_lower = query.lower()
@@ -124,15 +124,17 @@ class RecipeAgent(BaseAgent):
         return task
 
     def _search_by_name(self, query: str) -> Optional[str]:
+        import re
         for prefix in ["receta", "reseta", "busca", "dame", "buscar"]:
-            idx = query.lower().find(prefix)
-            if idx >= 0:
-                name = query[idx + len(prefix):].strip()
+            pattern = r'(?<![a-záéíóúüñ])' + re.escape(prefix) + r'(?![a-záéíóúüñ])'
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                name = query[match.end():].strip()
                 for word in ["la", "el", "un", "una", "de", "del"]:
-                    if name.lower().startswith(word + " "):
-                        name = name[len(word) + 1:]
+                    name = re.sub(r'^' + re.escape(word) + r'\b\s*', '', name, flags=re.IGNORECASE).strip()
                 if name:
                     return self.call_tool("buscar_receta", name)
+                break
         return self.call_tool("buscar_receta", query)
 
     def _search_by_ingredients(self, query: str) -> Optional[str]:
