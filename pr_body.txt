@@ -1,0 +1,26 @@
+## Cambios
+
+### Reorganización del repositorio
+- Estructura limpia: tests/, scripts/, docs_internos/, evaluation/, ops/, prompting/
+- README.md con documentación completa del proyecto
+- Archivos temporales eliminados
+
+### Nuevos módulos
+- **Guardrails** (ops/guardrails.py): 23 patrones de detección de inyección, rate limiting, content filter
+- **Sistema Multiagent** (agents/multiagent.py): Planner + Executor con 5 agentes especializados
+- **DSPy Optimizer** (prompting/dspy_optimizer.py): Few-shot, query expansion, relevance feedback
+- **Ollama Provider**: Proveedor local gratuito (llama3.2, llama3.1, mistral, etc.)
+
+### Tests corregidos
+- Fix GUI tests: mock devuelve AIProvider.OPENROUTER en lugar de string
+- Fix Provider tests: convertidos a tests parametrizados con pytest
+- 78 tests pasan, 4 skipped, 2 errors (autenticación externa)
+
+### Documentación
+- docs_internos/resumen.md: Resumen completo del proyecto
+- Documentación interna reorganizada
+
+## Resultados
+- 69 archivos cambiados
+- 12,948 inserciones, 896 eliminaciones
+- Tests: 78 passed, 4 skipped
