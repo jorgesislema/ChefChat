@@ -34,3 +34,6 @@ telemetry_exports/
 # PR y configuración local
 pr_body.txt
 pyrightconfig.json
+
+# Entrega oficial (documentación generada)
+ChefChat_Pro_v1.0_Entrega_Oficial/
