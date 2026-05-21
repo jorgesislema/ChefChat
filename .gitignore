@@ -30,3 +30,7 @@ telemetry_exports/
 # Archivos generados
 *.xlsx
 *.csv
+
+# PR y configuración local
+pr_body.txt
+pyrightconfig.json
