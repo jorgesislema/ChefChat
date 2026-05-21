@@ -1,0 +1,5 @@
+nombre,ingredientes,comensales,costo_produccion
+# Completar con las recetas del restaurante
+# ingredientes: formato JSON con nombre, cantidad, unidad
+# Ejemplo:
+# Arroz con Pollo,"[{""nombre"": ""Arroz"", ""cantidad"": 2, ""unidad"": ""kg""}, {""nombre"": ""Pollo"", ""cantidad"": 1, ""unidad"": ""kg""}]",10,15.50

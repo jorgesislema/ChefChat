@@ -1,0 +1,7 @@
+id_empleado,nombre_completo,cargo,turno,hora_entrada,hora_salida,dias_descanso,tipo_contrato
+# Completar con los empleados del restaurante
+# turno: matutino, vespertino, nocturno
+# tipo_contrato: fijo, temporal
+# Ejemplo:
+# EMP001,Juan Perez,Cocinero,matutino,08:00,17:00,Domingo,fijo
+# EMP002,Maria Garcia,Mesera,vespertino,14:00,23:00,Lunes,temporal

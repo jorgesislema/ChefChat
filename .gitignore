@@ -1,40 +1,23 @@
-# Python
 .venv/
 __pycache__/
+.mypy_cache/
 *.pyc
+*.db
+*.sqlite
+.env
+logs/
+docs_internos/
+*.log
+C:\Temp\ChefChat_Sandbox\
 *.egg-info/
 dist/
 build/
 *.spec
-.pytest_cache/
-.mypy_cache/
-
-# Base de datos (contiene datos locales)
-*.db
-*.sqlite
-
-# Entorno y logs
-.env
-logs/
-*.log
-
-# Sandbox temporal
-C:\Temp\ChefChat_Sandbox\
-
-# Exportaciones de telemetria (datos generados)
-telemetry_exports/
-
-# Documentacion interna (opcional, descomentar si se desea incluir)
-# docs_internos/
-
-# Archivos generados
-*.xlsx
-*.csv
-
-# PR y configuración local
-pr_body.txt
-pyrightconfig.json
-
-# Entrega oficial (documentación generada)
-ChefChat_Pro_v1.0_Entrega_Oficial/
-Documentacion_ChefChat_Pro_v1.0_Entrega_Oficial/
+architecture.md
+code_and_tests.md
+design.md
+implementation_plan.md
+technical_design.md
+docs_internos
+documentacion.py
+docs_internos

@@ -1,0 +1,229 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "ChefChat-Pro"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "chefchat-evaluation"
+          },
+          "spans": [
+            {
+              "traceId": "25887cc3-ffcf-4966-afe4-20b1b56969fc",
+              "spanId": "64247a8a",
+              "parentSpanId": "",
+              "name": "openrouter_completion",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": 1779122438187160064,
+              "endTimeUnixNano": 1779122438197773056,
+              "attributes": [
+                {
+                  "key": "operation",
+                  "value": {
+                    "stringValue": "llm_call"
+                  }
+                },
+                {
+                  "key": "latency.ms",
+                  "value": {
+                    "doubleValue": 245.5
+                  }
+                },
+                {
+                  "key": "tokens.input",
+                  "value": {
+                    "intValue": "150"
+                  }
+                },
+                {
+                  "key": "tokens.output",
+                  "value": {
+                    "intValue": "300"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": "gpt-4o"
+                  }
+                },
+                {
+                  "key": "provider",
+                  "value": {
+                    "stringValue": "openrouter"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK",
+                "message": ""
+              }
+            },
+            {
+              "traceId": "bd26a2c5-80a1-47ee-aa3e-14fc168fa191",
+              "spanId": "344521b9",
+              "parentSpanId": "",
+              "name": "buscar_receta",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": 1779122438197783040,
+              "endTimeUnixNano": 1779122438197794048,
+              "attributes": [
+                {
+                  "key": "operation",
+                  "value": {
+                    "stringValue": "tool_call"
+                  }
+                },
+                {
+                  "key": "latency.ms",
+                  "value": {
+                    "doubleValue": 12.3
+                  }
+                },
+                {
+                  "key": "tokens.input",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "tokens.output",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": ""
+                  }
+                },
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "buscar_receta"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK",
+                "message": ""
+              }
+            },
+            {
+              "traceId": "a0783601-c125-4da5-9c00-d058108911fc",
+              "spanId": "18ae81af",
+              "parentSpanId": "",
+              "name": "generar_lista_compras",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": 1779122438197797888,
+              "endTimeUnixNano": 1779122438197804800,
+              "attributes": [
+                {
+                  "key": "operation",
+                  "value": {
+                    "stringValue": "tool_call"
+                  }
+                },
+                {
+                  "key": "latency.ms",
+                  "value": {
+                    "doubleValue": 89.7
+                  }
+                },
+                {
+                  "key": "tokens.input",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "tokens.output",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": ""
+                  }
+                },
+                {
+                  "key": "tool_name",
+                  "value": {
+                    "stringValue": "generar_lista_compras"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK",
+                "message": ""
+              }
+            },
+            {
+              "traceId": "79f08233-533a-448d-a323-b20b24488d4d",
+              "spanId": "e4fa20ca",
+              "parentSpanId": "",
+              "name": "sqlite_query",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": 1779122438197807104,
+              "endTimeUnixNano": 1779122438197812992,
+              "attributes": [
+                {
+                  "key": "operation",
+                  "value": {
+                    "stringValue": "db_query"
+                  }
+                },
+                {
+                  "key": "latency.ms",
+                  "value": {
+                    "doubleValue": 5.2
+                  }
+                },
+                {
+                  "key": "tokens.input",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "tokens.output",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "model",
+                  "value": {
+                    "stringValue": ""
+                  }
+                },
+                {
+                  "key": "table",
+                  "value": {
+                    "stringValue": "RecetasRAG"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK",
+                "message": ""
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
