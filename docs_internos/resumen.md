@@ -2,305 +2,333 @@
 
 ## 1. Vision General
 
-ChefChat Pro es un asistente de escritorio para gestion de restaurantes que combina IA conversacional, agentes especializados, RAG (Retrieval-Augmented Generation) e integracion con Microsoft Office. Construido con PyQt6 para Windows, utiliza un patron de orquestador de agentes con aprobacion humana en el ciclo (HITL) para garantizar seguridad en operaciones criticas.
+ChefChat Pro es un asistente de escritorio para gestion de restaurantes que combina IA conversacional, agentes especializados con prompts individuales, RAG (Retrieval-Augmented Generation) e integracion con Microsoft Office. Construido con PyQt6 para Windows, utiliza un sistema multiagente donde cada agente tiene su propio prompt de sistema y usa el LLM seleccionado por el usuario.
 
 ## 2. Estructura del Repositorio
 
 ```
 ChefChat/
 ├── main.py                    # Punto de entrada de la aplicacion
+├── documentacion.py           # Generador de documentacion Word + HTML
 ├── requirements.txt           # Dependencias Python
-├── chefchat.db                # Base de datos SQLite (17 tablas)
+├── chefchat.db                # Base de datos SQLite (17+ tablas)
 ├── pyrightconfig.json         # Configuracion de type checking
 ├── .gitignore                 # Archivos excluidos de git
 │
 ├── agents/                    # Agentes de IA y orquestacion
-│   ├── orchestrator.py        # Orquestador principal con routing inteligente
-│   ├── multiagent.py          # Sistema multiagente (Planner + Executor)
-│   ├── tools.py               # Herramientas disponibles para agentes
-│   └── [otros archivos]
+│   ├── orchestrator.py        # Orquestador principal con routing y alertas
+│   ├── multiagent.py          # Sistema multiagente (5 agentes + Planner + Executor)
+│   ├── tools.py               # 58 herramientas operativas
+│   ├── alertas.py             # Sistema de alertas cruzadas entre agentes
+│   └── mcp_client.py          # Cliente MCP para Office
 │
 ├── core/                      # Componentes centrales
-│   ├── config.py              # Configuracion y proveedores AI
+│   ├── config.py              # Configuracion y 7 proveedores AI
 │   ├── models.py              # Modelos Pydantic y contratos
-│   └── [otros archivos]
+│   ├── security.py            # Validacion de seguridad
+│   └── rag_classifier.py      # Clasificador automatico de documentos
 │
 ├── data/                      # Gestion de datos y RAG
-│   ├── menu_semanal.py        # CRUD MenuSemanalPro con RAG
-│   └── [otros archivos]
+│   ├── db_manager.py          # Gestor SQLite con seed_mermas y personal
+│   ├── rag_store.py           # Almacen RAG con deteccion de duplicados
+│   └── menu_semanal.py        # CRUD MenuSemanalPro con RAG
 │
 ├── data_source/               # Fuentes de datos externas
-│   └── [documentos y recetas]
+│   ├── 1_recetas/             # 18 archivos CSV de recetas
+│   └── 3_inventario/          # Catalogo y lotes de inventario
 │
 ├── evaluation/                # Evaluaciones y metricas
 │   └── [archivos de evaluacion]
 │
-├── gui/                       # Interaz grafica PyQt6
-│   └── [componentes de UI]
+├── gui/                       # Interfaz grafica PyQt6
+│   ├── main_window.py         # Ventana principal con sidebar
+│   ├── worker.py              # Worker thread con HITL
+│   └── telemetry_view.py      # Dashboard de telemetria
 │
 ├── ops/                       # Operaciones y seguridad
-│   ├── guardrails.py          # Proteccion contra inyeccion de prompts
-│   └── [otros modulos]
+│   └── guardrails.py          # Proteccion contra inyeccion de prompts
 │
 ├── prompting/                 # Optimizacion de prompts
-│   ├── dspy_optimizer.py      # Optimizador estilo DSPy
-│   └── [otros archivos]
+│   └── dspy_optimizer.py      # Optimizador estilo DSPy
 │
 ├── scripts/                   # Scripts de utilidad
 │   ├── data_seeder.py         # Poblacion inicial de datos
-│   ├── cargar_capacitacion.py # Carga de documentos de capacitacion
-│   ├── diagnose_keys.py       # Diagnostico de API keys
-│   ├── check_setup.py         # Verificacion de configuracion
-│   └── security_scan.py       # Escaneo de seguridad
+│   └── [scripts de diagnostico]
 │
-├── tests/                     # Pruebas unitarias e integracion
-│   ├── conftest.py            # Configuracion de pytest
-│   ├── test_new_modules.py    # 38 tests para modulos nuevos
-│   ├── test_evaluation.py     # Tests de evaluacion
-│   ├── test_export_mermas.py  # Tests de exportacion de mermas
-│   ├── test_extraccion.py     # Tests de extraccion de datos
-│   ├── test_menu_*.py         # Tests de menus y comidas
-│   ├── test_orchestrator_flow.py # Tests de flujo del orquestador
-│   ├── test_providers.py      # Tests de proveedores AI
-│   ├── test_gui.py            # Tests de interfaz grafica
-│   ├── test_mcp.py            # Tests de integracion MCP
-│   ├── test_models.py         # Tests de modelos Pydantic
-│   ├── test_worker.py         # Tests de worker threads
-│   ├── golden_tests_ejemplo.json # Datos golden para tests
-│   └── test_results_raw.txt   # Resultados crudos de tests
+├── tests/                     # 38 tests unitarios e integracion
+│   └── [archivos de prueba]
 │
+├── plantillas/                # Plantillas Office
+├── imagenes/                  # Recursos graficos
 ├── telemetry_exports/         # Exportaciones de telemetria
-│   └── [archivos de telemetria]
 │
 └── docs_internos/             # Documentacion interna
-    ├── resumen.md             # ESTE ARCHIVO - Resumen general
+    ├── resumen.md             # ESTE ARCHIVO
     ├── architecture.md        # Arquitectura conceptual
-    ├── design.md              # Decisiones de diseno
-    ├── implementation_plan.md # Plan de implementacion
-    ├── MANUAL.md              # Manual de usuario
-    └── [otros documentos]
+    └── [17 documentos]
 ```
 
 ## 3. Arquitectura del Sistema
 
 ### 3.1 Patron Principal
-- **Clean Architecture + MVC + Orquestador de Agentes**
-- Separacion estricta entre GUI (PyQt6), logica de negocio (Pydantic) e infraestructura (APIs, MCP)
+- **Clean Architecture + MVC + Multiagente con LLM compartido**
+- Separacion estricta entre GUI (PyQt6), logica de negocio (Pydantic) e infraestructura
 
 ### 3.2 Componentes Clave
 
 | Componente | Responsabilidad | Tecnologia |
 |------------|----------------|-------------|
-| Orchestrator | Routing de peticiones a agentes especializados | LangChain + logica custom |
-| Multiagent System | Planner + Executor con 5 agentes especializados | Patrón Planner/Executor |
-| Guardrails | Proteccion contra inyeccion de prompts | 23 patrones de deteccion |
-| RAG Engine | Busqueda semantica en documentos | SQLite + keyword matching |
-| MCP Client | Integracion con Word/Excel | Servidor MCP externo |
-| HITL Controller | Aprobacion humana antes de acciones criticas | threading.Event + Qt signals |
-| DSPy Optimizer | Optimizacion de prompts con few-shot examples | Heuristic scoring |
-| Telemetry | Registro de metricas y rendimiento | SQLite + export CSV/JSON |
+| Orchestrator | Routing con 9 prioridades + alertas cruzadas | LangChain + regex |
+| Multiagent System | 5 agentes con prompts individuales + LLM | ABC + LangChain |
+| AlertManager | Alertas proactivas entre agentes (1er mensaje) | SQLite + heuristicas |
+| Guardrails | Proteccion contra inyeccion de prompts | 23 patrones |
+| RAG Engine | Busqueda semantica en documentos | SQLite LIKE + full text |
+| MCP Client | Integracion con Word/Excel/PowerPoint | COM automation |
+| HITL Controller | Aprobacion humana antes de acciones criticas | threading.Event + Qt |
+| Telemetry | Registro de metricas y rendimiento | SQLite + CSV/JSON |
 
 ### 3.3 Proveedores de IA
 
-| Proveedor | Modelo | Costo | Uso |
-|-----------|--------|-------|-----|
-| OpenRouter | MiniMax 2.7 | Bajo | Principal |
-| Ollama | llama3.2, llama3.1, mistral, etc. | Gratis | Local |
-| Azure OpenAI | GPT-4, etc. | Variable | Enterprise |
+| Proveedor | Modelo | Costo |
+|-----------|--------|-------|
+| DeepSeek | deepseek-chat | Bajo |
+| OpenRouter | MiniMax 2.7b | Bajo |
+| Ollama | llama3.2, mistral | Gratis |
+| OpenAI | gpt-4o | Medio |
+| Claude | claude-3-5-sonnet | Medio |
+| Gemini | gemini-1.5-flash | Bajo |
+| OpenCode | big-pickle | Gratis |
 
 ## 4. Flujo de Procesamiento
 
 ### 4.1 Flujo Principal de Peticion
 
 ```
-1. Usuario envia peticion en GUI
-2. Guardrails valida la entrada (inyeccion, rate limiting, contenido)
-3. Orchestrator clasifica la intencion y detecta prioridad
-4. DSPy Optimizer expande y optimiza el prompt
-5. Routing decision:
-   ├── Consulta simple → Agente directo
-   ├── Busqueda de recetas → RAG Engine + Agente Recetas
-   ├── Gestion de inventario → Agente Inventario
-   ├── Creacion de menu → Agente Menu
-   ├── Analisis de mermas → Agente Waste
-   ├── Documentos Office → MCP Client (con HITL)
-   └── Tarea compleja → Multiagent System (Planner + Executor)
-6. Respuesta formateada y enviada a GUI
-7. Telemetria registrada
+1. Usuario envia peticion en GUI (selecciona agente o modo Auto)
+2. Guardrails valida la entrada
+3. Orchestrator clasifica por prioridad (9 niveles):
+   PRI 1: Exportacion a Word/Excel/PPT
+   PRI 2: Menu semanal
+   PRI 3: Busqueda de documentos (RAG)
+   PRI 3.5: Consultas de personal
+   PRI 4: Receta por ID
+   PRI 5: Menu por ingredientes
+   PRI 6: Mermas con extraccion de fecha
+   PRI 7: Receta por nombre
+   PRI 8: Herramientas detectables
+   PRI 9: LLM directo (fallback)
+4. Si agente forzado: ruteo directo al agente con su prompt
+5. AlertManager inyecta alertas cruzadas (solo 1er mensaje)
+6. Contexto de exportacion guardado automaticamente
+7. Respuesta enviada a GUI
 ```
 
-### 4.2 Flujo HITL (Human-in-the-Loop)
+### 4.2 Sistema Multiagente (v2.0)
 
 ```
-1. Agente genera accion critica (ej: crear archivo Word)
-2. QThread emite senal request_approval a GUI
-3. QThread se pausa con event.wait()
-4. Usuario ve preview en panel derecho de GUI
-5. Usuario hace clic en Aprobar/Rechazar
-6. GUI llama a event.set() si aprobo
-7. QThread se reanuda y ejecuta accion via MCP
-8. Resultado guardado en SQLite
+Cada agente tiene:
+  - Su propio system_prompt en ingles (optimizado para tokens)
+  - Instruccion final: "ALWAYS respond in Spanish"
+  - Acceso al LLM compartido seleccionado por el usuario
+  - Keywords para deteccion de intencion
+  - Tools deterministas como primera opcion
+  - LLM como fallback con datos del RAG
+
+Agentes:
+  1. RecipeAgent (Chef Ejecutivo)
+     - Prompt: recetas, ingredientes, preparacion
+     - Tools: buscar_receta, buscar_recetas_con_ingrediente, escalar_receta
+  
+  2. InventoryAgent (Jefe de Inventario)
+     - Prompt: stock, caducidades, compras
+     - Tools: productos_por_caducar, verificar_stock_bajo, registrar_compra
+  
+  3. MenuAgent (Chef de Planificacion)
+     - Prompt: menus semanales, anti-desperdicio
+     - Tools: consultar_menu_semanal, menu_anti_desperdicio, agregar_plato_menu
+  
+  4. WasteAgent (Controlador de Mermas)
+     - Prompt: reportes, dashboard, clasificacion
+     - Tools: reporte_mermas, registrar_merma, dashboard_sobrantes
+  
+  5. DocumentAgent (Oficial de Cumplimiento y Personal)
+     - Prompt: documentos RAG + gestion de personal
+     - Tools: buscar_documento, consultar_turno_hoy, consultar_personal_activo,
+              consultar_personal_ausente, registrar_ausencia, registrar_permiso_rapido
 ```
 
-### 4.3 Sistema Multiagente
+## 5. Base de Datos
 
-```
-Planner:
-  - Analiza peticion compleja
-  - Asigna tareas por prioridad y keywords
-  - Decide estrategia: single/parallel/sequential
+### 5.1 Tablas Principales
 
-Executor:
-  - Ejecuta tareas asignadas
-  - Combina resultados de multiples agentes
-  - Maneja errores y reintentos
+| Tabla | Descripcion | Novedades v2.0 |
+|-------|-------------|-----------------|
+| RecetasRAG | Recetas con busqueda semantica | - |
+| Catalogo | Productos con vida util | +64 items con nombres CSV |
+| Inventario | Stock de ingredientes | +referencias Catalogo corregidas |
+| Mermas | Registro de desperdicios | +seed_mermas_realistas (160 registros) |
+| MenuSemanalPro | Menus semanales | +28 platos (Lunes-Domingo) |
+| Trabajadores | Personal del restaurante | +tipo_contrato, estado, ausencias |
+| DocumentosRAG | Documentos cargados | +deteccion de duplicados |
+| DocumentosTexto | Contenido completo de docs | +contenido_completo |
+| Telemetry | Metricas de rendimiento | - |
+| SobrantesReutilizables | Sobrantes por turno | +dashboard |
 
-Agentes Especializados:
-  1. Recipe Agent: Busqueda y generacion de recetas
-  2. Inventory Agent: Gestion de inventario y stock
-  3. Menu Agent: Creacion de menus semanales
-  4. Waste Agent: Analisis y reduccion de mermas
-  5. Document Agent: Generacion de documentos Office
-```
+### 5.2 Trabajadores - Columnas nuevas
 
-## 5. Modulos Implementados
+| Columna | Proposito |
+|---------|-----------|
+| tipo_contrato | fijo / temporal |
+| estado | activo / reposo_medico / permiso_maternidad / vacaciones / suspendido |
+| fecha_inicio_contrato | Inicio del contrato |
+| fecha_fin_contrato | Fin (temporales) |
+| fecha_inicio_ausencia | Inicio de baja |
+| fecha_fin_ausencia | Fin de baja / retorno |
+| motivo_ausencia | Razon de la ausencia |
 
-### 5.1 Guardrails (`ops/guardrails.py`)
-- **Deteccion de inyeccion de prompts**: 23 patrones conocidos
-- **Validacion de entrada**: Longitud maxima, caracteres prohibidos
-- **Rate limiting**: 30 peticiones/minuto por usuario
-- **Filtrado de contenido**: Bloqueo de contenido inapropiado
+## 6. Herramientas Nuevas (v2.0)
 
-### 5.2 Ollama Provider (`core/config.py`, `agents/orchestrator.py`)
-- **Proveedor local gratuito**: `http://localhost:11434/v1`
-- **Modelos soportados**: llama3.2, llama3.1, mistral, codellama, phi3, gemma2
-- **Costo cero**: Ideal para desarrollo y uso sin API keys
+### 6.1 Compras Inteligentes
+- `registrar_compra`: Lenguaje natural → "se compro 3 kintales de harina caduca 12-03-2027"
+- Detecta: producto, cantidad, unidad, fecha caducidad, categoria, vida util
 
-### 5.3 DSPy Optimizer (`prompting/dspy_optimizer.py`)
-- **Few-shot prompt optimization**: Mejora prompts con ejemplos
-- **Query expansion**: Sinonimos de alimentos y terminos culinarios
-- **Relevance feedback**: Tracking de efectividad de prompts
+### 6.2 Permisos y Personal
+- `registrar_permiso_rapido`: "juan saco permiso por paternidad 6 dias"
+- `consultar_turno_hoy`: Personal activo hoy por turno
+- `consultar_personal_activo`: Todos los activos
+- `consultar_personal_ausente`: Bajas con fechas de retorno
+- `registrar_ausencia`: Registro formal de ausencia
+- `reincorporar_trabajador`: Alta tras ausencia
 
-### 5.4 Multiagent System (`agents/multiagent.py`)
-- **Planner/Executor pattern**: Division inteligente de tareas
-- **5 agentes especializados**: Recipe, Inventory, Menu, Waste, Document
-- **Estrategias de ejecucion**: Single, parallel, sequential
+### 6.3 Inventario
+- `dar_de_baja`: Rotura/dano → "plato sopero, 5, piezas, rotura, 25.00"
+- `seed_mermas`: Genera datos realistas de mermas (160 registros/30 dias)
 
-## 6. Base de Datos
+### 6.4 Registro de Mermas
+- `registrar_merma`: Acepta formato clasico y lenguaje natural
+  - "23 kilos de cerdo de merma"
+  - "3 kg de pan se echo a perder"
+  - "cebolla, 2.5, kg, se echo a perder, 1.50"
 
-### 6.1 Tablas Principales (17 tablas en chefchat.db)
+## 7. Alertas Cruzadas (Nuevo)
 
-| Tabla | Descripcion |
-|-------|-------------|
-| RecetasRAG | Recetas con busqueda semantica |
-| Inventario | Stock de ingredientes |
-| Mermas | Registro de desperdicios |
-| MenuSemanalPro | Menus semanales con RAG |
-| Telemetry | Metricas de rendimiento |
-| Conversaciones | Historial de chats |
-| [otras 11 tablas] | Configuraciones, usuarios, etc. |
+`agents/alertas.py` - Sistema que inyecta alertas proactivas al final de cada respuesta (solo primer mensaje):
 
-### 6.2 Limitaciones Actuales de RAG
-- Usa SQLite `LIKE` para busqueda por keywords
-- **No usa embeddings semanticos** → falla en consultas semanticas (ej: "BPM" no encuentra "Protocolos de Emergencia")
-- **Mejora pendiente**: Implementar FAISS/Chroma + `sentence-transformers`
+| Tipo | Que verifica | Sugerencia |
+|------|-------------|------------|
+| Personal | Quien esta de baja, fecha retorno | - |
+| Caducidad | Productos a 3 dias | Recetas para aprovecharlos |
+| Stock bajo | < 5 unidades | Generar lista de compras |
 
-## 7. Seguridad
+## 8. Contratos Pydantic (v2.0)
 
-### 7.1 Protecciones Implementadas
-- **API Keys**: Almacenadas en keyring del SO, nunca en codigo
-- **Guardrails**: Intercepta prompts maliciosos antes de procesamiento
-- **HITL**: Aprobacion obligatoria para acciones criticas
-- **Sandbox**: Pruebas MCP limitadas a directorio seguro
+`core/models.py` — 30 modelos con validacion estricta de tipos, unidades, estados y fechas:
 
-### 7.2 Archivos Ignorados (.gitignore)
-```
-venv/
-.env
-*.db
-*.sqlite
-__pycache__/
-*.log
-```
+### Personal (4 modelos)
+| Modelo | Valida | Propiedades |
+|--------|--------|-------------|
+| Trabajador | id_empleado, cargo, turno (4), estado (7), tipo_contrato (4) | en_ausencia, dias_para_retorno |
+| AusenciaInput | tipo (6), fechas ISO YYYY-MM-DD | - |
+| ReincorporarInput | id_empleado | - |
+| PermisoRapidoInput | mensaje 10-500 chars | - |
 
-## 8. Pruebas
+### Mermas (2)
+| Modelo | Valida |
+|--------|--------|
+| MermaInput | producto, cantidad>0, costo>=0 |
+| MermaReporteOutput | periodo_dias, totales, por_tipo, por_dia, top_productos |
 
-### 8.1 Suite de Tests (38 tests principales)
+### Compras e Inventario (3)
+| Modelo | Valida |
+|--------|--------|
+| CompraInput | mensaje, cant>0, categoria |
+| BajaInventarioInput | producto, cant>0, motivo, costo>=0 |
+| Inventario (actualizado) | 35 unidades validas (antes 8) |
 
-| Modulo | Tests | Cobertura |
-|--------|-------|-----------|
-| Guardrails | 10 | Inyeccion, validacion, rate limiting |
-| Ollama Provider | 4 | Configuracion, modelos, pricing |
-| DSPy Optimizer | 8 | Few-shot, query expansion, feedback |
-| Multiagent | 13 | Planner, Executor, agentes especializados |
-| Integracion | 3 | Flujo completo con guardrails + multiagent |
+### Menu (2)
+| Modelo | Valida |
+|--------|--------|
+| MenuPlato | dia (7), servicio (6: desayuno, almuerzo, merienda, cena, a_la_carta, especial), precio>=0 |
+| MenuSemanalOutput | semana, platos[], costo_promedio |
 
-### 8.2 Ejecucion de Tests
+### Documentos y Alertas (2)
+| Modelo | Valida |
+|--------|--------|
+| DocumentoRAGModel | tipo (7: receta, catalogo, lotes, manual_bpm, generico, capacitacion, personal) |
+| AlertasOutput | personal_ausente[], productos_por_caducar[], stock_bajo[], sugerencias[] |
+
+### Legacy (11)
+Ingrediente, Receta, Evento, AccionOffice, Catalogo, VistaCaducidad, BitacoraDiaria, VentasHistoricas, IncidenciaInput, UsoInventarioInput, EscalarRecetaInput, CaducidadInput, AnalisisRentabilidadOutput
+
+## 8. Exportacion a Office (Mejorado)
+
+- Exporta datos tabulares desde contexto guardado (no solo texto)
+- PowerPoint acepta datos tabulares (antes solo recetas)
+- Limpieza de Markdown antes de enviar a Word (formato profesional)
+- Contexto guardado automaticamente en cada respuesta
+- Deteccion automatica de tipo: Merma, Menu, Personal, Documento, etc.
+
+## 9. GUI - Sidebar
+
+| Boton | Funcion |
+|-------|---------|
+| Chat | Panel principal |
+| Telemetria | Dashboard de uso |
+| Configuracion | API Keys |
+| Limpiar chat | Resetea historial y contexto |
+| Documentacion | Genera Word + HTML desde resumen.md |
+| Tema | Claro/Oscuro |
+
+### 9.1 Selector de Agente
+Barra dedicada "Agente:" entre el chat y el input. Opciones: Auto, Recetas, Inventario, Menu, Mermas, Documentos.
+
+## 10. Prompts en Ingles (Optimizacion)
+
+Todos los prompts del sistema estan en ingles para ahorrar ~28% de tokens. Cada prompt termina con `ALWAYS respond in Spanish.`
+
+| Prompt | Tokens (antes) | Tokens (ahora) | Ahorro |
+|--------|---------------|----------------|--------|
+| RecipeAgent | ~120 | ~85 | -29% |
+| InventoryAgent | ~90 | ~65 | -28% |
+| MenuAgent | ~140 | ~100 | -29% |
+| WasteAgent | ~130 | ~95 | -27% |
+| DocumentAgent | ~150 | ~115 | -23% |
+| Orchestrator | ~250 | ~180 | -28% |
+
+## 11. Documentacion Automatizada
+
+`documentacion.py` - Genera desde `resumen.md`:
+- **Word** `.docx` (42 KB) - Portada profesional, encabezados, tablas, codigo con fondo oscuro
+- **HTML** `.html` (44 KB) - Abre en navegador, Ctrl+P → guardar como PDF
+- Sin dependencias externas (python-docx puro, sin WeasyPrint/GTK)
+- Accesible desde el boton en la sidebar
+
+## 12. Pruebas
+
+### Suite de Tests (51 tests)
+
+| Modulo | Tests |
+|--------|-------|
+| Guardrails | 10 |
+| Ollama Provider | 4 |
+| DSPy Optimizer | 8 |
+| Multiagent | 13 |
+| Integracion | 3 |
+| Modelos Pydantic | 13 |
+
 ```bash
 python -m pytest tests/ -v
 ```
 
-## 9. Scripts de Utilidad
+## 13. Comandos Utiles
 
-| Script | Funcion |
-|--------|---------|
-| `scripts/data_seeder.py` | Poblacion inicial de datos de prueba |
-| `scripts/cargar_capacitacion.py` | Carga de documentos de capacitacion |
-| `scripts/diagnose_keys.py` | Diagnostico de API keys configuradas |
-| `scripts/check_setup.py` | Verificacion de configuracion completa |
-| `scripts/security_scan.py` | Escaneo de seguridad del proyecto |
-
-## 10. Limitaciones Conocidas
-
-### 10.1 RAG
-- **Problema**: Busqueda por keywords (`LIKE`) en lugar de embeddings semanticos
-- **Impacto**: No encuentra documentos semanticamente relacionados
-- **Solucion pendiente**: Implementar FAISS/Chroma + sentence-transformers
-
-### 10.2 HITL
-- **Problema**: Flag `requiere_hitl` existe pero UI de aprobacion inactiva
-- **Impacto**: No hay cola de aprobacion ni mecanismo de pausa visible
-- **Solucion pendiente**: Implementar UI de aprobacion y cola pendiente
-
-### 10.3 Dependencias
-- **Problema**: Algunas funciones requieren APIs externas
-- **Impacto**: Costo operativo y dependencia de conectividad
-- **Mitigacion**: Ollama como alternativa local gratuita
-
-## 11. Proximos Pasos Prioritarios
-
-1. **Implementar embeddings reales para RAG** (FAISS/Chroma + sentence-transformers)
-2. **Implementar UI de aprobacion HITL** con cola pendiente
-3. **Agregar contratos Pydantic** para validacion estricta de datos
-4. **Soporte .env** para configuracion flexible
-5. **GitHub Secret Scanning + Dependabot** antes de push a repositorio
-6. **Documentacion adicional** para cada modulo
-
-## 12. Comandos Utiles
-
-### Ejecucion
 ```bash
-python main.py                    # Iniciar aplicacion
-python -m pytest tests/ -v        # Ejecutar tests
-python scripts/check_setup.py     # Verificar configuracion
+python main.py                           # Iniciar aplicacion
+python documentacion.py                  # Generar documentacion Word + HTML
+python -m pytest tests/ -v               # Ejecutar tests
 ```
-
-### Desarrollo
-```bash
-pip install -r requirements.txt   # Instalar dependencias
-python -m pyright                 # Type checking
-python scripts/security_scan.py   # Escaneo de seguridad
-```
-
-## 13. Contacto y Recursos
-
-- **Documentacion interna**: `docs_internos/`
-- **Tests**: `tests/`
-- **Scripts**: `scripts/`
-- **Base de datos**: `chefchat.db` (SQLite)
-- **Configuracion**: `core/config.py`
 
 ---
 
 *Ultima actualizacion: Mayo 2026*
-*Version: ChefChat Pro v1.0*
+*Version: ChefChat Pro v2.0*

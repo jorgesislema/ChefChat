@@ -358,6 +358,50 @@ class ChatBubble:
         '''
 
 
+def limpiar_markdown_para_office(texto: str) -> str:
+    """
+    Convierte texto Markdown a formato profesional para Word/Excel/PPT.
+    Elimina frontmatter YAML, normaliza headers, limpia formato crudo.
+    """
+    import re
+    
+    # 1. Eliminar YAML frontmatter (bloques entre --- al inicio)
+    texto = re.sub(r'^---\s*\n.*?\n---\s*\n', '', texto, flags=re.DOTALL)
+    
+    # 2. Eliminar separadores Markdown largos (----, ====, ****)
+    texto = re.sub(r'^[-=*_]{3,}\s*$', '', texto, flags=re.MULTILINE)
+    
+    # 3. Convertir headers Markdown a texto limpio
+    texto = re.sub(r'^#{1,6}\s+', '', texto, flags=re.MULTILINE)
+    
+    # 4. Eliminar formato inline: **bold**, *italic*, `code`
+    texto = re.sub(r'\*\*(.+?)\*\*', r'\1', texto)
+    texto = re.sub(r'\*(.+?)\*', r'\1', texto)
+    texto = re.sub(r'`(.+?)`', r'\1', texto)
+    
+    # 5. Eliminar IDs y metadatos YAML (clave: valor)
+    texto = re.sub(r'^\w+:\s*.+$', '', texto, flags=re.MULTILINE)
+    
+    # 6. Eliminar líneas con solo espacios o puntuación
+    texto = re.sub(r'^\s*[-–—•·]\s', '  • ', texto, flags=re.MULTILINE)
+    
+    # 7. Normalizar saltos de línea (máximo 2 seguidos)
+    texto = re.sub(r'\n{3,}', '\n\n', texto)
+    
+    # 8. Eliminar referencias a imágenes y links, mantener texto
+    texto = re.sub(r'!\[.*?\]\(.*?\)', '', texto)
+    texto = re.sub(r'\[(.+?)\]\(.*?\)', r'\1', texto)
+    
+    # 9. Limpiar espacios al inicio/final
+    texto = texto.strip()
+    
+    # 10. Eliminar líneas vacías consecutivas
+    while '\n\n\n' in texto:
+        texto = texto.replace('\n\n\n', '\n\n')
+    
+    return texto
+
+
 class MainWindow(QMainWindow):
     """
     Ventana principal de ChefChat Pro.
@@ -385,11 +429,15 @@ class MainWindow(QMainWindow):
         self._pending_action_data: Optional[Dict[str, Any]] = None
         self._selected_provider: Optional[AIProvider] = None
         self._selected_model: Optional[str] = None
+        self._selected_agent: Optional[str] = None
         self._ultimo_id_receta: Optional[str] = None
         self._ultima_respuesta: str = ""
         self._chat_history: List[str] = []
+        self._alertas_mostradas: bool = False  # Solo el primer mensaje
         self.provider_selector: Optional[QComboBox] = None
         self.model_selector: Optional[QComboBox] = None
+        self.agent_selector: Optional[QComboBox] = None
+        self.agent_label: Optional[QLabel] = None
         self.chat_area: Optional[QTextEdit] = None
         self.input_field: Optional[QTextEdit] = None
         self.btn_send: Optional[QPushButton] = None
@@ -461,6 +509,18 @@ class MainWindow(QMainWindow):
         
         sidebar_layout.addStretch()
         
+        self.sidebar_clear = QPushButton("🗑️")
+        self.sidebar_clear.setObjectName("sidebar_btn")
+        self.sidebar_clear.setToolTip("Limpiar chat")
+        self.sidebar_clear.clicked.connect(self._clear_chat)
+        sidebar_layout.addWidget(self.sidebar_clear)
+        
+        self.sidebar_docs = QPushButton("📄")
+        self.sidebar_docs.setObjectName("sidebar_btn")
+        self.sidebar_docs.setToolTip("Generar documentación (Word + HTML)")
+        self.sidebar_docs.clicked.connect(self._generar_documentacion)
+        sidebar_layout.addWidget(self.sidebar_docs)
+        
         self.sidebar_theme = QPushButton("🌙")
         self.sidebar_theme.setObjectName("sidebar_btn")
         self.sidebar_theme.setToolTip("Cambiar tema")
@@ -492,6 +552,7 @@ class MainWindow(QMainWindow):
         
         left_layout.addWidget(self._build_selector_bar())
         left_layout.addWidget(self._build_chat_area(), stretch=1)
+        left_layout.addWidget(self._build_agent_bar())
         left_layout.addWidget(self._build_input_widget())
         left_layout.addWidget(self._build_action_bar())
         
@@ -523,6 +584,36 @@ class MainWindow(QMainWindow):
         sel_layout.addWidget(self.btn_config)
         
         return selector_bar
+
+    def _build_agent_bar(self) -> QWidget:
+        agent_bar = QWidget()
+        agent_bar.setObjectName("selector_bar")
+        agent_layout = QHBoxLayout(agent_bar)
+        agent_layout.setContentsMargins(0, 4, 0, 4)
+        agent_layout.setSpacing(6)
+        
+        self.agent_label = QLabel("Agente:")
+        self.agent_label.setStyleSheet(
+            f"font-weight: bold; font-size: 9pt; color: {self.current_theme['accent']}; "
+            f"padding: 4px 0; min-width: 50px;"
+        )
+        agent_layout.addWidget(self.agent_label)
+        
+        self.agent_selector = QComboBox()
+        self.agent_selector.setObjectName("agent_selector")
+        self.agent_selector.addItem("Auto (deteccion automatica)", None)
+        self.agent_selector.addItem("Recetas", "recipe")
+        self.agent_selector.addItem("Inventario", "inventory")
+        self.agent_selector.addItem("Menú", "menu")
+        self.agent_selector.addItem("Mermas", "waste")
+        self.agent_selector.addItem("Documentos", "document")
+        self.agent_selector.setCurrentIndex(0)
+        self.agent_selector.setMinimumWidth(140)
+        self.agent_selector.currentIndexChanged.connect(self._on_agent_changed)
+        self.agent_selector.setToolTip("Seleccionar agente especializado. Auto = detección automática.")
+        agent_layout.addWidget(self.agent_selector, stretch=1)
+        
+        return agent_bar
 
     def _build_chat_area(self) -> QTextEdit:
         self.chat_area = QTextEdit()
@@ -678,6 +769,74 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(generate_stylesheet(self.current_theme))
         self._update_theme_dependent_elements()
 
+    def _clear_chat(self) -> None:
+        """Limpia el historial del chat y el contexto de exportacion."""
+        if self.chat_area:
+            self.chat_area.clear()
+        self._chat_history = []
+        self._ultima_respuesta = ""
+        self._ultimo_id_receta = None
+        self._rag_files = []
+        self._alertas_mostradas = False  # Reactivar alertas para nueva sesion
+        # Limpiar contexto de exportacion
+        try:
+            from agents.orchestrator import guardar_contexto_exportacion
+            guardar_contexto_exportacion(datos=[], columnas=[], titulo="")
+        except Exception:
+            pass
+        self._append_system_message("Chat limpiado. Listo para nueva consulta.")
+
+    def _generar_documentacion(self) -> None:
+        """Genera documentacion profesional (Word + HTML) desde resumen.md."""
+        import os
+        import subprocess
+        from pathlib import Path
+        
+        proyecto_dir = Path(__file__).parent.parent
+        doc_script = proyecto_dir / "documentacion.py"
+        resumen_md = proyecto_dir / "docs_internos" / "resumen.md"
+        
+        if not doc_script.exists():
+            self._append_system_message("❌ No se encontro documentacion.py")
+            return
+        
+        if not resumen_md.exists():
+            self._append_system_message("❌ No se encontro docs_internos/resumen.md")
+            return
+        
+        self._append_system_message("📄 Generando documentacion profesional...")
+        
+        try:
+            import sys
+            python_exe = sys.executable
+            resultado = subprocess.run(
+                [python_exe, str(doc_script)],
+                cwd=str(proyecto_dir),
+                capture_output=True, text=True, timeout=30
+            )
+            for linea in resultado.stdout.split('\n'):
+                if linea.strip():
+                    self._append_system_message(linea.strip())
+            if resultado.stderr:
+                for linea in resultado.stderr.split('\n')[:3]:
+                    if linea.strip():
+                        self._append_system_message(f"⚠️ {linea.strip()}")
+            
+            # Verificar archivos generados
+            docx = proyecto_dir / "docs_internos" / "ChefChat_SOP_Documentacion.docx"
+            html = proyecto_dir / "docs_internos" / "ChefChat_SOP_Documentacion.html"
+            
+            if docx.exists():
+                self._append_system_message(f"✅ Word: {docx.name} ({docx.stat().st_size // 1024} KB)")
+            if html.exists():
+                self._append_system_message(f"✅ HTML: {html.name} ({html.stat().st_size // 1024} KB)")
+                self._append_system_message("💡 El HTML se abrio en tu navegador. Ctrl+P para guardar como PDF.")
+            
+        except subprocess.TimeoutExpired:
+            self._append_system_message("❌ Timeout al generar documentacion")
+        except Exception as e:
+            self._append_system_message(f"❌ Error: {e}")
+
     def _update_theme_dependent_elements(self) -> None:
         """Actualiza elementos que dependen del tema."""
         if self.right_title is not None:
@@ -704,6 +863,12 @@ class MainWindow(QMainWindow):
         if self.telemetry_dashboard is not None:
             is_dark = self.theme_mode == "dark"
             self.telemetry_dashboard.apply_theme(is_dark)
+        if self.agent_label is not None:
+            accent_color = self.current_theme['accent']
+            self.agent_label.setStyleSheet(
+                f"font-weight: bold; font-size: 9pt; color: {accent_color}; "
+                f"padding: 4px 0; min-width: 50px;"
+            )
 
     def _update_provider_selector(self) -> None:
         """Actualiza el selector de proveedores de IA."""
@@ -744,6 +909,12 @@ class MainWindow(QMainWindow):
             return
         if self.model_selector:
             self._selected_model = self.model_selector.currentData()
+
+    def _on_agent_changed(self, index: int) -> None:
+        if index < 0:
+            return
+        if self.agent_selector:
+            self._selected_agent = self.agent_selector.currentData()
 
     def _update_model_selector(self) -> None:
         if self.model_selector is None:
@@ -796,6 +967,12 @@ class MainWindow(QMainWindow):
             str: Mensaje formateado para el usuario.
         """
         lineas = [f"✅ Documentos guardados: {resultados['guardados']}/{resultados['total']}"]
+        
+        duplicados = resultados.get("duplicados", 0)
+        if duplicados > 0:
+            lineas.append(f"⚠️  Duplicados detectados: {duplicados} (no se cargaron de nuevo)")
+            for nombre in resultados.get("duplicados_nombres", [])[:5]:
+                lineas.append(f"  - {nombre}")
         
         if resultados["recetas"] > 0:
             lineas.append(f"  📖 Recetas: {resultados['recetas']}")
@@ -890,13 +1067,17 @@ class MainWindow(QMainWindow):
         
         try:
             self._append_system_message(f"⏳ Procesando con {provider.value}...")
-            logging.info("Creating Orchestrator with provider=%s, model=%s", provider, self._selected_model)
+            logging.info("Creating Orchestrator with provider=%s, model=%s, agent=%s", provider, self._selected_model, self._selected_agent)
             
             orchestrator = Orchestrator(
                 provider=provider,
                 model=self._selected_model,
-                db_manager=self.db  # For telemetry
+                db_manager=self.db,  # For telemetry
+                forced_agent_role=self._selected_agent,
+                mostrar_alertas=not self._alertas_mostradas
             )
+
+            self._alertas_mostradas = True
             
             logging.info("Orchestrator created successfully")
             
@@ -1026,19 +1207,27 @@ class MainWindow(QMainWindow):
                     self._append_system_message(f"✅ {resultado}")
                     return
 
+            # Fallback: enviar texto como contenido (limpiando Markdown)
+            contenido = limpiar_markdown_para_office(contenido)
             titulo = contenido.split("\n")[0][:60] or "Reporte"
             if "RECETA:" in contenido.upper():
                 titulo = "Receta"
+            elif "MERMA" in contenido.upper() or "MERMAS" in contenido.upper():
+                titulo = "Reporte de Mermas"
             elif "PLANIFICACION" in contenido.upper():
                 titulo = "Planificación de Evento"
             elif "LISTA DE COMPRAS" in contenido.upper():
                 titulo = "Lista de Compras"
             elif "ORDEN DE COMPRA" in contenido.upper():
                 titulo = "Orden de Compra"
-            elif "MENU" in contenido.upper():
+            elif "MENU" in contenido.upper() or "MENÚ" in contenido.upper():
                 titulo = "Menú"
             elif "DASHBOARD" in contenido.upper():
                 titulo = "Dashboard"
+            elif "PERSONAL" in contenido.upper():
+                titulo = "Personal"
+            elif "DOCUMENTO" in contenido.upper():
+                titulo = "Documento"
 
             self._append_system_message(
                 f"⏳ Enviando a {app.title()}..."

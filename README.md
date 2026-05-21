@@ -1,8 +1,8 @@
 # ChefChat Pro
 
-Asistente de escritorio con IA para gestion integral de restaurantes. Combina agentes especializados, RAG, proteccion contra inyeccion de prompts e integracion con Microsoft Office con aprobacion humana en el ciclo (HITL).
+Asistente de escritorio con IA para gestion integral de restaurantes. Sistema multiagente donde cada agente tiene su propio prompt de sistema, usa el LLM seleccionado por el usuario, y responde solo con datos del RAG. Integracion con Microsoft Office, alertas cruzadas entre agentes, y gestion de personal.
 
-## Caracteristicas
+## Novedades v2.0
 
 - **Orquestador de Agentes**: Routing inteligente a agentes especializados (Recetas, Inventario, Menus, Mermas, Documentos)
 - **Sistema Multiagente**: Planner + Executor con 5 agentes especializados para tareas complejas
@@ -16,7 +16,7 @@ Asistente de escritorio con IA para gestion integral de restaurantes. Combina ag
 - **Configuracion .env**: Soporte para variables de entorno para configuracion flexible
 - **Inyeccion de Dependencias**: Container DI para mejor testabilidad
 
-## Estructura del Proyecto
+## Estructura
 
 ```
 ChefChat/
@@ -26,11 +26,12 @@ ChefChat/
 ├── .env.example               # Plantilla de configuracion
 ├── .gitignore                 # Archivos excluidos de git
 │
-├── agents/                    # Agentes de IA
-│   ├── orchestrator.py        # Orquestador principal
-│   ├── multiagent.py          # Sistema multiagente (Planner + Executor)
-│   ├── tools.py               # Herramientas disponibles
-│   └── mcp_client.py          # Cliente MCP para Office
+├── agents/
+│   ├── orchestrator.py        # Routing 9 prioridades + alertas
+│   ├── multiagent.py          # 5 agentes con prompts + LLM
+│   ├── tools.py               # 58 herramientas
+│   ├── alertas.py             # Alertas cruzadas
+│   └── mcp_client.py          # Word/Excel/PPT
 │
 ├── core/                      # Componentes centrales
 │   ├── config.py              # Configuracion y proveedores AI
@@ -88,25 +89,13 @@ ChefChat/
     └── [otros documentos]     # Evaluaciones, seguridad, etc.
 ```
 
-## Requisitos
-
-- Python 3.13+
-- Windows 10/11
-- PyQt6
-- OpenRouter API key (opcional, Ollama es gratuito)
-
 ## Instalacion
 
 ```bash
-# Clonar repositorio
-git clone <url-del-repo>
+git clone <url>
 cd ChefChat
-
-# Crear entorno virtual
 python -m venv .venv
 .venv\Scripts\activate
-
-# Instalar dependencias
 pip install -r requirements.txt
 
 # Copiar configuracion
@@ -117,20 +106,12 @@ copy .env.example .env
 ## Uso
 
 ```bash
-# Iniciar aplicacion
-python main.py
-
-# Ejecutar tests
-python -m pytest tests/ -v
-
-# Verificar configuracion
-python scripts/check_setup.py
-
-# Escaneo de seguridad
-python scripts/security_scan.py
+python main.py                  # Iniciar app
+python documentacion.py         # Generar docs
+python -m pytest tests/ -v      # Tests
 ```
 
-## Configuracion de Proveedores de IA
+## Proveedores IA
 
 ### OpenRouter (Principal)
 1. Obtener API key en https://openrouter.ai
