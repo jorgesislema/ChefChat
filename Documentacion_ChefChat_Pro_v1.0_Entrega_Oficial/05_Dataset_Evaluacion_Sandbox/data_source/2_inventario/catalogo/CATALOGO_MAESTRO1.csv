@@ -1,0 +1,16 @@
+ID_Producto,Nombre,Categoria,Tipo_Caducidad,Vida_Util_Dias
+PROD-001,Pollo Pechuga,Proteinas,Dinamica,3
+PROD-002,Tomate Cherry,Vegetales,Dinamica,5
+PROD-003,Harina de Trigo,Secos,Fija,0
+PROD-004,Salmón Noruego,Pescados,Dinamica,2
+PROD-005,Leche Entera,Lácteos,Dinamica,7
+PROD-006,Huevos Extra,Lácteos,Dinamica,14
+PROD-007,Queso Crema,Lácteos,Dinamica,10
+PROD-008,Cebolla Morada,Vegetales,Dinamica,7
+PROD-009,Aceite de Oliva,Aceites,Fija,0
+PROD-010,Cilantro Fresco,Hierbas,Dinamica,4
+PROD-011,Mantequilla sin Sal,Lácteos,Dinamica,21
+PROD-012,Cloro Granulado,Limpieza,Fija,0
+PROD-013,Desengrasante Industrial,Limpieza,Fija,0
+PROD-014,Sal Marina,Condimentos,Fija,0
+PROD-015,Azúcar Refinada,Condimentos,Fija,0

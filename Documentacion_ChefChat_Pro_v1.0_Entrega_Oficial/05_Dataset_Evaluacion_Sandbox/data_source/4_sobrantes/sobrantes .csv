@@ -1,0 +1,41 @@
+ID_Sobrante,Fecha_Registro,Producto_Sobro,Cantidad,Unidad,Dias_Reutilizacion_Sanitaria,Destino_Actual
+SOB-001,5/14/2026,Arroz blanco cocido,4.5,kg,2,Reutilizado
+SOB-002,5/14/2026,Salsa de champiñones,2,lt,3,Pendiente
+SOB-003,5/14/2026,Ensalada César preparada,1.5,kg,0,Basura
+SOB-004,5/14/2026,Pollo desmenuzado cocido,3.2,kg,2,Personal
+SOB-005,5/14/2026,Puré de papa con mantequilla,2.8,kg,2,Pendiente
+SOB-006,5/15/2026,Caldo de pollo concentrado,5,lt,3,Reutilizado
+SOB-007,5/15/2026,Masa de empanada cruda,1.8,kg,1,Basura
+SOB-008,5/15/2026,Vegetales salteados mixtos,2.5,kg,2,Pendiente
+SOB-009,5/15/2026,Carne mechada en salsa,4,kg,2,Reutilizado
+SOB-010,5/15/2026,Frijoles negros cocidos,3.5,kg,3,Personal
+SOB-011,5/16/2026,Pasta fettuccine cocida,2.2,kg,2,Pendiente
+SOB-012,5/16/2026,Pan rallado sazonado,1,kg,5,Pendiente
+SOB-013,5/16/2026,Mermelada de fresa casera,0.8,kg,10,Reutilizado
+SOB-014,5/16/2026,Crema pastelera,1.5,lt,1,Basura
+SOB-015,5/16/2026,Pesto de albahaca fresco,0.6,lt,3,Personal
+SOB-016,5/17/2026,Aderezo de yogur y eneldo,1.2,lt,2,Pendiente
+SOB-017,5/17/2026,Galletas decoradas con fondant,24,unidad,14,Reutilizado
+SOB-018,5/17/2026,Sopa de verduras triturada,3,lt,2,Personal
+SOB-019,5/17/2026,Queso parmesano rallado,0.9,kg,5,Basura
+SOB-020,5/17/2026,Cebolla caramelizada,1.4,kg,3,Reutilizado
+SOB-021,5/13/2026,Tomate concassé,2,kg,1,Basura
+SOB-022,5/13/2026,Ají amarillo molido,0.5,kg,7,Pendiente
+SOB-023,5/13/2026,Camarones cocidos pelados,1.8,kg,1,Personal
+SOB-024,5/13/2026,Fondant blanco sobrante,3.5,kg,30,Reutilizado
+SOB-025,5/12/2026,Merengue italiano,1,kg,1,Basura
+SOB-026,5/12/2026,Ganache de chocolate,2.2,kg,7,Reutilizado
+SOB-027,5/12/2026,Masa de hojaldre cruda,2.5,kg,2,Pendiente
+SOB-028,5/12/2026,Zanahoria rallada para ensalada,1.6,kg,1,Basura
+SOB-029,5/12/2026,Pechuga de pollo a la plancha,3.8,kg,2,Personal
+SOB-030,5/11/2026,Salsa bechamel,1.8,lt,2,Reutilizado
+SOB-031,5/13/2026,Quinua cocida,2.4,kg,2,Pendiente
+SOB-032,5/12/2026,Hummus de garbanzos,1.3,kg,3,Personal
+SOB-033,5/14/2026,Champiñones salteados con ajo,1.9,kg,2,Reutilizado
+SOB-034,5/13/2026,Crema de espinacas,1.5,lt,2,Basura
+SOB-035,5/12/2026,Masa para pizza fermentada,4,kg,1,Reutilizado
+SOB-036,5/11/2026,Salsa de tomate casera,3.2,lt,4,Pendiente
+SOB-037,5/11/2026,Papa criolla frita,2.1,kg,0,Basura
+SOB-038,5/11/2026,Costilla de cerdo desmenuzada,2.7,kg,2,Personal
+SOB-039,5/12/2026,Almíbar para postres,1,lt,14,Reutilizado
+SOB-040,5/17/2026,Mantequilla compuesta con hierbas,0.7,kg,5,Pendiente

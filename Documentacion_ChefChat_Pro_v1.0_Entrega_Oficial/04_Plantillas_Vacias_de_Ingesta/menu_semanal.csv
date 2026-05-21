@@ -1,8 +1,0 @@
-dia_semana,tipo_comida,nombre_plato,precio_venta
-# Completar con el menu semanal base
-# dia_semana: Lunes, Martes, Miercoles, Jueves, Viernes, Sabado, Domingo
-# tipo_comida: Desayuno, Almuerzo, Cena, Servicio_Especial
-# Ejemplo:
-# Lunes,Desayuno,Huevos Rancheros,5.50
-# Lunes,Almuerzo,Pollo Asado,8.00
-# Lunes,Cena,Sopa de Verduras,4.50

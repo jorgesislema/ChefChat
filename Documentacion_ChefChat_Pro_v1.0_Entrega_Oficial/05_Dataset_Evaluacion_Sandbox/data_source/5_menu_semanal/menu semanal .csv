@@ -1,0 +1,29 @@
+ID_Plan,Dia_Semana,Tipo_Servicio,Nombre_Plato,Precio_Venta_USD,Requiere_Prep_Previa
+PLN-001,Lunes,Desayuno,Huevos Benedictinos con Salmón Ahumado,18.50,FALSE
+PLN-002,Lunes,Almuerzo,"Ensalada de Quinoa, Aguacate y Tomate Cherry",16.00,FALSE
+PLN-003,Lunes,Merienda,Tartaletas de Crema de Cacao,12.00,TRUE
+PLN-004,Lunes,A_La_Carta,"Lomo de Res al Oporto, con Trufa Negra",42.00,TRUE
+PLN-005,Martes,Desayuno,Bowl de Açaí y Granola Artesanal,15.00,FALSE
+PLN-006,Martes,Almuerzo,Risotto de Hongos Silvestres,24.50,FALSE
+PLN-007,Martes,Merienda,Croquetas de Jamón Ibérico,14.00,TRUE
+PLN-008,Martes,A_La_Carta,Cordero Asado con Miel y Romero,38.50,TRUE
+PLN-009,Miercoles,Desayuno,Tortilla Francesa con Finas Hierbas,14.00,FALSE
+PLN-010,Miercoles,Almuerzo,"Tataki de Atún, Sésamo y Jengibre",22.00,TRUE
+PLN-011,Miercoles,Merienda,Panini de Prosciutto y Brie,13.50,FALSE
+PLN-012,Miercoles,A_La_Carta,Bacalao Confitado con Pilpil,35.00,TRUE
+PLN-013,Jueves,Desayuno,"Crepes de Nutella, Frutos Rojos y Menta",16.50,FALSE
+PLN-014,Jueves,Almuerzo,Pasta Fresca con Ragú Boloñesa,26.00,TRUE
+PLN-015,Jueves,Merienda,Sopa Fría de Melón y Jengibre,11.00,FALSE
+PLN-016,Jueves,A_La_Carta,"Filet Mignon en Costra de Pimienta, con Espárragos",45.00,TRUE
+PLN-017,Viernes,Desayuno,Chilaquiles Verdes con Pollo Deshebrado,17.50,FALSE
+PLN-018,Viernes,Almuerzo,Ceviche Mixto de la Casa,28.00,FALSE
+PLN-019,Viernes,Merienda,"Bruschetta de Burrata, Tomate y Albahaca",15.50,FALSE
+PLN-020,Viernes,A_La_Carta,Paella Valenciana para Dos,52.00,TRUE
+PLN-021,Sabado,Desayuno,Eggs Royale con Caviar de Salmón,24.00,TRUE
+PLN-022,Sabado,Almuerzo,"Costillas BBQ Glaseadas, en Horno Lento",32.00,TRUE
+PLN-023,Sabado,Merienda,Volován de Mariscos en Salsa Rosa,19.00,FALSE
+PLN-024,Sabado,A_La_Carta,Pato Confitado con Salsa de Naranja,48.00,TRUE
+PLN-025,Domingo,Desayuno,Brunch de Salmón Ahumado y Bagels,21.00,TRUE
+PLN-026,Domingo,Almuerzo,"Asado de Tira con Chimichurri, y Papas Doradas",36.50,FALSE
+PLN-027,Domingo,Merienda,Tiramisú Clásico en Copa,14.50,TRUE
+PLN-028,Domingo,A_La_Carta,"Fondue de Quesos Suizos, con Trufa y Pan Artesanal",44.00,TRUE
