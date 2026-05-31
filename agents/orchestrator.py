@@ -262,6 +262,8 @@ ALWAYS respond in Spanish.
         rag_only: bool = True,
         db_manager=None,  # For telemetry logging
         use_dspy: bool = False,  # Enable DSPy optimization
+        forced_agent_role: Optional[str] = None,
+        mostrar_alertas: bool = True,
     ) -> None:
         self.provider = provider or ConfigManager.get_configured_provider() or AIProvider.OPENAI
         self.forced_agent_role = forced_agent_role
@@ -395,8 +397,8 @@ ALWAYS respond in Spanish.
             
             self.llm = ChatOpenAI(
                 model=self.model_name,
-                openai_api_key=self.api_key,
-                openai_api_base=self.base_url,
+                api_key=self.api_key,
+                base_url=self.base_url,
                 temperature=0.7,
                 default_headers=openrouter_headers,
             )
