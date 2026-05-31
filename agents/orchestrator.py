@@ -262,6 +262,8 @@ ALWAYS respond in Spanish.
         rag_only: bool = True,
         db_manager=None,  # For telemetry logging
         use_dspy: bool = False,  # Enable DSPy optimization
+        forced_agent_role: Optional[str] = None,
+        mostrar_alertas: bool = True,
     ) -> None:
         self.provider = provider or ConfigManager.get_configured_provider() or AIProvider.OPENAI
         self.forced_agent_role = forced_agent_role
