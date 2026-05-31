@@ -397,8 +397,8 @@ ALWAYS respond in Spanish.
             
             self.llm = ChatOpenAI(
                 model=self.model_name,
-                openai_api_key=self.api_key,
-                openai_api_base=self.base_url,
+                api_key=self.api_key,
+                base_url=self.base_url,
                 temperature=0.7,
                 default_headers=openrouter_headers,
             )
