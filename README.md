@@ -1,214 +1,223 @@
-# ChefChat Pro
+# ChefChat Pro 🍳
 
-Asistente de escritorio con IA para gestion integral de restaurantes. Sistema multiagente donde cada agente tiene su propio prompt de sistema, usa el LLM seleccionado por el usuario, y responde solo con datos del RAG. Integracion con Microsoft Office, alertas cruzadas entre agentes, y gestion de personal.
+Asistente con IA para el dueño de un restaurante. Controla inventario y vencimientos, mermas, capacitaciones con exámenes y documentos. Responde con los datos reales del negocio y cita los manuales.
 
-## Novedades v2.0
+Se usa de dos formas:
+- **Web local** (nueva): `http://127.0.0.1:8765`. Es la forma recomendada.
+- **Escritorio** (PyQt6): `python main.py`.
 
-- **Orquestador de Agentes**: Routing inteligente a agentes especializados (Recetas, Inventario, Menus, Mermas, Documentos)
-- **Sistema Multiagente**: Planner + Executor con 5 agentes especializados para tareas complejas
-- **Guardrails**: Proteccion contra inyeccion de prompts con 23 patrones de deteccion, validacion de entrada, rate limiting y filtrado de contenido
-- **RAG**: Busqueda de documentos y recetas con expansion de consultas y sinonimos culinarios
-- **Proveedores de IA**: OpenRouter, Azure OpenAI, Ollama (local gratuito), Gemini
-- **HITL**: Aprobacion humana obligatoria para acciones criticas en Word/Excel/PowerPoint
-- **Telemetria**: Registro de metricas y rendimiento con exportacion CSV/JSON
-- **DSPy Optimizer**: Optimizacion de prompts con few-shot examples y feedback de relevancia
-- **Dashboards Profesionales**: Exportacion a Excel con graficos (COM o fallback openpyxl/matplotlib)
-- **Configuracion .env**: Soporte para variables de entorno para configuracion flexible
-- **Inyeccion de Dependencias**: Container DI para mejor testabilidad
+## Qué hace
+
+- **Vencimientos**: "¿qué vence en diciembre?", "¿qué vence en 2 semanas?", "¿qué ya venció?". Se responde con SQL directo, sin IA, para no inventar datos.
+- **Inventario, mermas y personal**: stock por producto, costo de mermas por motivo, personal por cargo y turno.
+- **Manuales y capacitaciones (RAG)**: busca en los manuales por relevancia (SQLite FTS5). La IA responde solo con los fragmentos hallados y cita documento y sección. Si no hay nada, lo dice.
+- **Exámenes**: modo práctica (feedback al instante) y modo evaluación (con tiempo, nota mínima 80 y 2 intentos). Las preguntas salen de los manuales y **el dueño las aprueba** antes de usarse.
+- **JEV (modelo juez)**: puntúa cada pregunta generada (¿es correcta y se responde con su fuente?) y juzga las pruebas del chat.
+- **Guardrails, HITL y telemetría**: protección contra inyección de prompts, aprobación humana para Word/Excel y registro de métricas.
 
 ## Estructura
 
 ```
 ChefChat/
-├── main.py                    # Punto de entrada
-├── requirements.txt           # Dependencias
-├── chefchat.db                # Base de datos SQLite
-├── .env.example               # Plantilla de configuracion
-├── .gitignore                 # Archivos excluidos de git
-│
+├── main.py                 # App de escritorio (PyQt6)
+├── server/                 # API local (FastAPI) y arranque: python -m server
+├── web/                    # Pantalla web (React + TypeScript + Tailwind + Vite)
+├── gui/                    # Ventanas de la app de escritorio
 ├── agents/
-│   ├── orchestrator.py        # Routing 9 prioridades + alertas
-│   ├── multiagent.py          # 5 agentes con prompts + LLM
-│   ├── tools.py               # 58 herramientas
-│   ├── alertas.py             # Alertas cruzadas
-│   └── mcp_client.py          # Word/Excel/PPT
-│
-├── core/                      # Componentes centrales
-│   ├── config.py              # Configuracion y proveedores AI
-│   ├── models.py              # Modelos Pydantic
-│   ├── rag_classifier.py      # Clasificador RAG
-│   ├── tool_contracts.py      # Contratos Pydantic para herramientas
-│   └── di_container.py        # Inyeccion de dependencias
-│
-├── data/                      # Gestion de datos
-│   ├── db_manager.py          # Gestor de base de datos
-│   ├── rag_store.py           # Almacen RAG
-│   ├── semantic_rag.py        # Busqueda semantica con FAISS
-│   ├── dashboard_fallback.py  # Fallback para dashboards sin COM
-│   └── menu_semanal.py        # CRUD MenuSemanalPro
-│
-├── data_source/               # Fuentes de datos externas
-│   ├── 1_recetas/             # Recetas en CSV
-│   └── 3_inventario/          # Catalogo e inventario
-│
-├── evaluation/                # Evaluaciones y metricas
-│
-├── gui/                       # Interfaz grafica PyQt6
-│   ├── main_window.py         # Ventana principal
-│   ├── worker.py              # Worker thread con HITL
-│   └── telemetry_view.py      # Vista de telemetria
-│
-├── ops/                       # Operaciones y seguridad
-│   └── guardrails.py          # Proteccion contra inyeccion
-│
-├── prompting/                 # Optimizacion de prompts
-│   └── dspy_optimizer.py      # Optimizador estilo DSPy
-│
-├── scripts/                   # Scripts de utilidad
-│   ├── data_seeder.py         # Poblacion inicial de datos
-│   ├── cargar_capacitacion.py # Carga de documentos
-│   ├── diagnose_keys.py       # Diagnostico de API keys
-│   ├── check_setup.py         # Verificacion de configuracion
-│   └── security_scan.py       # Escaneo de seguridad
-│
-├── tests/                     # Pruebas unitarias e integracion
-│   ├── conftest.py            # Configuracion de pytest
-│   ├── test_new_modules.py    # 38 tests para modulos nuevos
-│   ├── test_gui.py            # Tests de interfaz grafica
-│   ├── test_mcp.py            # Tests de integracion MCP
-│   ├── test_models.py         # Tests de modelos Pydantic
-│   ├── test_worker.py         # Tests de worker threads
-│   └── [otros tests]          # Tests de evaluacion, menus, etc.
-│
-├── telemetry_exports/         # Exportaciones de telemetria
-│
-└── docs_internos/             # Documentacion interna
-    ├── resumen.md             # Resumen general del proyecto
-    ├── architecture.md        # Arquitectura conceptual
-    ├── MANUAL.md              # Manual de usuario
-    └── [otros documentos]     # Evaluaciones, seguridad, etc.
+│   ├── orchestrator.py     # Orquestador: datos directos -> RAG -> herramientas -> IA
+│   ├── vencimientos.py     # Respuestas directas desde la base (sin IA)
+│   ├── consulta_chat.py, menu_chat.py, contexto.py   # Recetas, proveedores y menú en el chat
+│   └── multiagent.py, tools.py, mcp_client.py, alertas.py
+├── core/
+│   ├── config.py           # Proveedores de IA y claves
+│   ├── normalizar.py       # Normaliza textos antes de guardar (evita duplicados)
+│   ├── unidades.py, formato.py   # kg/g/l/unidad y dinero ($1.234,56)
+│   ├── jev.py              # Cliente de JEV (modelo juez)
+│   └── models.py, security.py, rag_classifier.py
+├── data/
+│   ├── esquema.py          # Tablas nuevas (se crean solas al arrancar)
+│   ├── inventario.py, proveedores.py, recetas.py, menu.py, carga.py
+│   ├── compras.py, conteos.py, turnos.py, balance.py, analisis.py
+│   ├── rag_docs.py         # RAG de manuales (fragmentos + FTS5)
+│   └── db_manager.py, rag_store.py, menu_semanal.py, vinculos.py
+├── examenes/
+│   ├── servicio.py         # Banco, intentos, notas, reporte
+│   └── generador.py        # Genera preguntas desde los manuales y las puntúa con JEV
+├── evaluation/             # Banco de 200 preguntas y pruebas del chat
+├── ops/, prompting/        # Guardrails y optimizador de prompts
+├── scripts/                # Utilidades y datos de demostración (ver abajo)
+├── tests/
+├── data_source/            # Recetas, catálogo y lotes en CSV
+├── docs/                   # Planes y diseño (exámenes, etapas, balance del turno)
+└── chefchat.db             # Base SQLite (no se sube a git)
 ```
 
-## Instalacion
+## Instalación
 
 ```bash
-git clone <url>
+git clone <url-del-repo>
 cd ChefChat
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
+copy .env.example .env      # y completa tus claves
+```
 
-# Copiar configuracion
-copy .env.example .env
-# Editar .env con tus valores
+Para construir la pantalla web (requiere Node 22+):
+
+```bash
+cd web
+npm install
+npm run build               # genera web/dist, que el servidor ya sirve
 ```
 
 ## Uso
 
 ```bash
-python main.py                  # Iniciar app
-python documentacion.py         # Generar docs
-python -m pytest tests/ -v      # Tests
+# Web: desde la carpeta raiz del proyecto (H:\git\ChefChat), no desde web\
+python -m server            # luego abre http://127.0.0.1:8765
+# o simplemente:
+.\iniciar.ps1
+
+# Desarrollo de la web (recarga en vivo; necesita el servidor abierto en otra terminal)
+cd web
+npm run dev
+
+# Escritorio
+python main.py
 ```
 
-## Proveedores IA
+El servidor solo escucha en `127.0.0.1`. Para otro puerto: `CHEFCHAT_PORT=8091`.
 
-### OpenRouter (Principal)
-1. Obtener API key en https://openrouter.ai
-2. Configurar en la aplicacion (boton de llave) o en `.env`
+### Pantallas web
+Inicio (resumen del día), Inventario (existencias, vencimientos, lotes, productos y conteo), Proveedores, Compras, Recetas, Menú, Mermas, Informe del turno (con el balance), Capacitación (para el trabajador), Manuales y Panel del dueño (preguntas, resultados, análisis y cambios). El asistente es la burbuja «Pregúntale a ChefChat» en todas las pantallas.
 
-### Ollama (Local Gratuito)
-1. Instalar Ollama desde https://ollama.ai
-2. Descargar modelo: `ollama pull llama3.2`
-3. Seleccionar Ollama en la aplicacion o configurar `CHEFCHAT_AI_PROVIDER=ollama` en `.env`
+El logo va en `web/public/logo.png`. Si no existe, se muestra un mirlo dibujado.
 
-### Azure OpenAI (Enterprise)
-1. Crear recurso en Azure Portal
-2. Configurar endpoint y API key en `.env`
-3. Seleccionar en la aplicacion
+## Configuración de IA
 
-### Google Gemini
-1. Obtener API key en https://ai.google.dev
-2. Configurar `CHEFCHAT_GEMINI_API_KEY` en `.env`
+Las claves van en `.env` (no se sube a git). Plantilla en `.env.example`.
 
-## Arquitectura
+| Proveedor | Variables |
+|---|---|
+| **custom** (100milionseek, recomendado para pruebas gratis) | `HMS_API_KEY` o `CHEFCHAT_CUSTOM_API_KEY`, `CHEFCHAT_CUSTOM_BASE_URL`, `CHEFCHAT_CUSTOM_MODEL=deepseek-v4.1-flash-free` |
+| JEV (modelo juez) | Misma clave. Modelo `jev-1.13-free`, ruta `POST /v1/systemone` |
+| SenseNova | `CHEFCHAT_SENSENOVA_API_KEY`, `CHEFCHAT_SENSENOVA_BASE_URL`, `CHEFCHAT_SENSENOVA_MODEL` |
+| OpenRouter, OpenAI, Gemini, Claude, DeepSeek, OpenCode | `CHEFCHAT_<PROVEEDOR>_API_KEY` |
+| Ollama (local) | `ollama pull llama3.2` |
 
-### Patron Principal
-Clean Architecture + MVC + Orquestador de Agentes + Inyeccion de Dependencias
+Elige el proveedor con `CHEFCHAT_AI_PROVIDER` (por ejemplo `custom`). El servidor usa `custom` solo si hay `HMS_API_KEY` y no definiste otro.
 
-### Flujo de Procesamiento
-1. Usuario envia peticion en GUI
-2. Guardrails valida la entrada
-3. Orchestrator clasifica intencion y detecta prioridad
-4. DSPy Optimizer expande y optimiza prompt (si esta habilitado)
-5. Routing a agente especializado o sistema multiagente
-6. Respuesta formateada y enviada a GUI
-7. Telemetria registrada
+## Datos y utilidades
 
-### Sistema Multiagente
-- **Planner**: Analiza peticion compleja, asigna tareas por prioridad
-- **Executor**: Ejecuta tareas, combina resultados, maneja errores
-- **Agentes**: Recipe, Inventory, Menu, Waste, Document
+```bash
+python scripts/unificar_duplicados.py       # une duplicados (hace copia de respaldo)
+python scripts/seed_lotes_diciembre.py      # lotes FICTICIOS que vencen en las próximas 8 semanas
+python scripts/generar_preguntas.py         # genera preguntas de examen (quedan "pendientes")
+python scripts/etapa_b_datos.py             # proveedores, precios, ventas, compras, conteos y balance FICTICIOS (repetible)
+python scripts/etapa_b_datos.py --solo balance   # solo una parte: ingredientes, proveedores, ventas, compras, conteos o balance
+python scripts/security_scan.py             # busca claves o datos personales escritos en el código
+python -c "from data import rag_docs; print(rag_docs.reindexar())"   # reindexa los manuales
+```
 
-### HITL (Human-in-the-Loop)
-- Aprobacion obligatoria para acciones criticas en Word/Excel/PowerPoint
-- QThread se pausa con `event.wait()` hasta aprobacion
-- Preview en panel derecho de GUI
-- Botones Aprobar/Rechazar con estilos visuales
-
-## Seguridad
-
-- API Keys almacenadas en keyring del SO o variables de entorno
-- Guardrails intercepta prompts maliciosos
-- Sandbox para pruebas MCP
-- Zero credenciales en codigo
-- Contratos Pydantic para validacion estricta de entrada/salida
+- Al guardar productos o mermas se normalizan mayúsculas, acentos y espacios (`core/normalizar.py`). La base tiene un índice único en el nombre del producto.
+- Los lotes de prueba y las preguntas generadas son datos de demostración.
 
 ## Pruebas
 
 ```bash
-# Todos los tests
-python -m pytest tests/ -v
+# Todo el backend (nunca toca tu chefchat.db: cada prueba usa una copia)
+python -m pytest tests -q
 
-# Tests especificos
-python -m pytest tests/test_new_modules.py -v
-python -m pytest tests/test_gui.py -v
-python -m pytest tests/test_mcp.py -v
+# Pantalla web
+cd web
+npx tsc --noEmit
+npx vitest run
+
+# Banco de 200 preguntas contra el chat real (usa tu IA)
+python evaluation/correr_banco.py --modo chat
+
+# 30 preguntas de manuales, juzgadas por JEV
+python evaluation/probar_rag_30.py 30
 ```
 
-### Resultados Actuales
-- **79 tests pasan**, 3 skipped, 2 errors (aislamiento Qt en ejecucion masiva)
-- Cobertura: Guardrails (10), Ollama (4), DSPy (8), Multiagent (13), Integracion (3), GUI (13), MCP (6), Modelos (12), Worker (5)
+### Últimos resultados medidos (25 nov 2026)
 
-## Documentacion
+| Prueba | Resultado |
+|---|---|
+| Backend completo (`pytest tests`, incluye la app de escritorio) | 330 pasan, 4 se saltan |
+| Pruebas de la web (Vitest) | 132 pasan |
+| Pruebas con clics reales en Edge (sobre una copia de la base) | 62 flujos pasan |
+| Banco de 200 preguntas (vencimientos, stock, mermas, personal) | 200/200 |
+| 30 preguntas de manuales, juzgadas por JEV | 28/30 |
 
-- `docs_internos/resumen.md` - Resumen completo del proyecto
-- `docs_internos/MANUAL.md` - Manual de usuario
-- `docs_internos/architecture.md` - Arquitectura conceptual
-- `docs_internos/INFORME_EVALUACION.md` - Informes de evaluacion
+Las pruebas de la app de escritorio usan una IA falsa: no llaman a ningún proveedor.
 
-## Limitaciones Conocidas
+## Proveedores, recetas y menú
 
-### RAG
-- Busqueda principal usa SQLite `LIKE` para keywords
-- Busqueda semantica con FAISS disponible pero requiere `sentence-transformers`
-- **Recomendacion**: Instalar `pip install faiss-cpu sentence-transformers` para busqueda semantica completa
+- **Proveedores**: quién vende qué y a qué precio, con historial, "el más barato" y aviso si un precio sube más de 10 %. Los datos de la demostración son ficticios.
+- **Recetas**: 280 recetas de `data_source/1_recetas`. El **costo por plato** es la columna `Costo_Estimado_USD` de tus archivos. El costo calculado con precios de proveedores es un dato secundario. Las recetas de eventos y las 5 de `recetas_principales.csv` (valores de 18 a 35, parecen precios) no entran a los menús diarios.
+- **Menú**: costo por persona de desayuno, almuerzo, merienda y cena; menú de 1 a 7 días con tope de costo y sin alérgenos; qué cocinar con lo que vence; y qué hacer con los sobrantes. Todo se calcula con código (`data/menu.py`). El asistente responde estas preguntas en el chat sin inventar platos ni precios.
+- **Cargar recetas y manuales**: botón "Cargar recetas" (CSV con las columnas de `data_source/1_recetas`, separado por coma o punto y coma) y botón "Cargar manual" (Word, PDF, texto o Markdown, hasta 5 MB). Se revisa cada fila, se dice qué se rechazó y por qué, y el asistente puede usar lo nuevo de inmediato. Si cargas otra vez el mismo ID de receta o el mismo manual, se actualiza (no se duplica). Un PDF escaneado como imagen no se puede leer.
+- **Asistente**: responde con código y la base de datos (sin inventar) recetas por ingrediente ("recetas con pollo sin lácteos"), la receta de un plato con ingredientes y pasos, recetas para aprovechar la merma, y preguntas de proveedores y precios ("¿quién vende pollo?", "¿qué vende Carnes del Valle?", "¿qué precios subieron?"). Lo demás pasa a la IA con los datos de la base y de los manuales como contexto. Nunca contesta en blanco.
+- Alérgenos: se revisan en la receta y en sus ingredientes. Ante la duda se excluye el plato. Revisa siempre con el chef.
 
-### HITL
-- UI de aprobacion implementada y funcional
-- Requiere que el worker este en modo de espera para aprobacion
+## Editar datos y análisis del dueño
 
-## Proximos Pasos
+- **Inventario → Lotes**: agregar, cambiar (cantidad, unidad, fechas) y quitar lotes. Si escribes un producto nuevo, se crea.
+- **Inventario → Productos**: cambiar nombre, categoría, tipo (alimento o limpieza) y vida útil; ver y cambiar el precio en cada proveedor; sumar un proveedor que lo vende. El filtro «Sin clasificar» ayuda a ordenar los productos creados desde las recetas. Un producto solo se puede quitar si nada lo usa.
+- **Proveedores**: editar datos, quitar un proveedor (sus precios se conservan), cambiar el precio de cada producto y quitar un producto que ya no vende.
+- **Panel del dueño → Análisis**: merma por mes, motivo y producto; merma recuperada; producido contra vendido (con el dinero que sobra); y los platos que más y menos dejan. Cada bloque dice de qué fechas son sus datos. Solo compara un mes con otro si los dos tienen al menos 20 días con datos.
+- **Panel del dueño → Cambios**: registro de todo lo que se cambia en precios, productos, lotes, proveedores y sobrantes.
+- **Menú → Sobrantes**: «Lo usé» (con el valor recuperado), «Lo boté» y «Lo doné».
+- Al cambiar un precio, el costo de las recetas se recalcula solo. Las ventas de la demostración son ficticias (`scripts/etapa_b_datos.py --solo ventas` las vuelve a crear).
+- Para probar o hacer una demo sin tocar tus datos: `$env:CHEFCHAT_DB_FILE="C:\ruta\copia.db"` antes de `python -m server`.
 
-1. Implementar pipeline de evaluacion continua
-2. Agregar GitHub Actions CI/CD workflow
-3. Patrones de error boundary para degradacion graceful
-4. GitHub Secret Scanning + Dependabot
+## Compras, costo real e informe del turno
 
-## Licencia
+- **Compras**: registrar lo que se compra (proveedor, producto, cantidad, precio). Calcula el total al momento (2000 g a $9,50 el kg = $19,00), puede sumar el lote al inventario y guardar el precio como el de hoy del proveedor. Una compra mal anotada se puede anular; su lote se quita solo si nadie lo usó.
+- **Costo real** (Panel → Análisis): compara lo gastado en alimentos con lo que debió costar lo vendido según las recetas, y reparte la diferencia en sobreproducción, merma anotada y «sin explicar». Sin conteos de inventario se supone que lo comprado se usó en el mismo periodo: con menos de 28 días de datos, el sistema avisa que es poco preciso.
+- **Informe del turno**: se llena solo con lo que ya está en la base (producido y vendido, merma del día, sobrantes, compras, incidencias y el personal del turno, sin quien descansa o está ausente). El chef corrige, agrega incidencias y observaciones, guarda borradores y firma. Firmado ya no cambia, sus incidencias pasan a la bitácora y se puede imprimir. El historial muestra todos los informes.
+- Turnos: Mañana = desayuno y almuerzo; Tarde = merienda y cena; Noche = sin servicio. Las mermas no tienen turno: el informe muestra las del día y lo dice.
+- Datos de demostración: `python scripts/etapa_b_datos.py --solo compras` crea compras ficticias (marcadas) coherentes con las ventas ficticias.
+- **Conteo de inventario** (Inventario → Conteo): se arma una hoja con lo que dice el sistema, se anota lo que hay de verdad (se guarda de a poco y se puede imprimir para contar a mano) y se cierra. Al cerrar se puede ajustar el inventario a lo contado: lo que falta sale de lo que vence antes y lo que sobra entra como lote de ajuste. Con dos conteos cerrados, el costo real es exacto: inventario inicial + compras − inventario final. `python scripts/etapa_b_datos.py --solo conteos` crea conteos ficticios a fin de cada mes.
 
-MIT License - Ver archivo [LICENSE](LICENSE) para mas detalles.
+## Balance del turno (kilos y unidades)
 
----
+Sirve para ver la merma que nadie anota (lo que queda en la máquina, se riega o se come el personal). Detalle en `docs/PLAN_BALANCE_TURNO.md`.
 
-*Ultima actualizacion: Mayo 2026*
+- **La cuenta**: `entró = salió bueno + pérdida normal + anotado + sin explicar`. Entró = lo que bodega entregó menos lo devuelto. Salió bueno = unidades × peso por unidad (o el peso de la receta). Anotado = merma pesada + comida del personal + residuo de limpieza + muestras. **Sin explicar positivo = falta.**
+- **Semáforo**: Alarma si lo sin explicar pasa la tolerancia de la receta (2 % por defecto); Cerca si pasa el 75 % de la tolerancia.
+- **Por ingrediente**: entregado − uso según receta − merma. Primero sale el que más dinero pierde: ahí está la fuga.
+- **Por unidades**: producido (lo dice el turno) contra recibido (lo cuenta otra persona en mostrador o despacho).
+- **Dónde**: Informe del turno → Balance del turno (botones para anotar entregas, devoluciones, merma, comida del personal y residuo de limpieza; sale al imprimir y se congela al firmar). Recetas → Estándar de producción. Panel → Análisis → Pérdida sin explicar por turno. Inventario → Productos → Editar → peso de 1 unidad o 1 litro.
+- Una entrega de bodega descuenta el inventario (lo que vence antes primero); una devolución lo vuelve a sumar.
+- Datos de demostración: `python scripts/etapa_b_datos.py --solo balance` crea 7 días de entregas, mermas y comida del personal ficticias (sin tocar el inventario). El sábado 21 nov por la tarde pierde 7 % de chocolate para ver la alarma.
+
+## Seguridad
+
+- Claves en `.env` o en el keyring del sistema. Nunca en el código.
+- Guardrails contra inyección de prompts. Sandbox para Office.
+- La API solo escucha en `127.0.0.1`.
+- Los exámenes no muestran la respuesta correcta al trabajador en modo evaluación.
+- Un proveedor de terceros ve tus mensajes. Usa datos ficticios en las pruebas.
+
+## Limitaciones conocidas
+
+- La búsqueda en manuales es por palabras (FTS5), no por significado. Funciona bien con preguntas claras.
+- Proveedores, precios, ventas, compras, conteos y balance de la demostración son FICTICIOS (marcados `es_demo`).
+- 15 lotes del inventario apuntan a productos que no están en el catálogo.
+- Quedan 3 preguntas de examen «pendientes»: se aprueban en el Panel del dueño.
+- La app de escritorio es la versión anterior: lo nuevo (compras, conteo, turno, balance) solo está en la web.
+
+## Documentación
+
+- `docs/PLAN_ETAPAS.md`: qué pidió el cliente y en qué orden se hizo.
+- `docs/PLAN_BALANCE_TURNO.md`: balance del turno en kilos y unidades.
+- `docs/DISENO_EXAMENES.md`: diseño del módulo de exámenes.
+
+## Autor
+
+Hecho por **Jorge Sislema**. Licencia MIT.
+
+*Última actualización: 25 de noviembre de 2026*

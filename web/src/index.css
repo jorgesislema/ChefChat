@@ -1,0 +1,31 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 244 241 234; --surface: 255 255 255; --line: 222 217 206; --ink: 14 14 16; --muted: 98 98 104;
+  --brand: 196 115 0; --ok: 18 128 70; --warn: 156 94 0; --bad: 196 30 30;
+}
+.dark {
+  --bg: 14 14 16; --surface: 23 23 26; --line: 42 42 47; --ink: 244 241 234; --muted: 163 163 170;
+  --brand: 245 163 26; --ok: 61 220 132; --warn: 255 176 32; --bad: 255 92 92;
+}
+body { @apply bg-bg text-ink font-sans antialiased; }
+:focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 2px; border-radius: 6px; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise .25s ease-out both; }
+@keyframes shimmer { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+.skeleton { @apply rounded-lg bg-line; animation: shimmer 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
+@media print {
+  .no-print, aside { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+  .print-area { max-width: none !important; padding: 0 !important; color: #000 !important; }
+  .print-area * { color: #000 !important; border-color: #999 !important; background: transparent !important; }
+}
+.md p { @apply my-2; } .md ul { @apply my-2 list-disc pl-5; } .md ol { @apply my-2 list-decimal pl-5; }
+.md h1,.md h2,.md h3 { @apply mt-3 mb-1 font-semibold; } .md a { @apply text-brand underline; }
+.md table { @apply my-2 w-full border-collapse text-sm; } .md th,.md td { @apply border border-line px-2 py-1 text-left; }
+.md th { @apply bg-bg; } .md code { @apply rounded bg-bg px-1; }

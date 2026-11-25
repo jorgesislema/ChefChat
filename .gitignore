@@ -1,23 +1,31 @@
 .venv/
 __pycache__/
 .mypy_cache/
+.pytest_cache/
 *.pyc
-*.db
-*.sqlite
-.env
-logs/
-docs_internos/
-*.log
-C:\Temp\ChefChat_Sandbox\
 *.egg-info/
 dist/
 build/
 *.spec
+
+# Datos locales y secretos
+*.db
+*.sqlite
+.env
+
+# Copias de respaldo, registros y resultados generados
+*.bak
+*.log
+logs/
+evaluation/resultado_*.json
+telemetry_exports/
+dashboard_sobrantes_*.xlsx
+plantillas/
+
+# Documentos internos de trabajo
+docs_internos/
 architecture.md
 code_and_tests.md
 design.md
 implementation_plan.md
 technical_design.md
-docs_internos
-documentacion.py
-docs_internos

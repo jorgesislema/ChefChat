@@ -1,5 +1,6 @@
 """Orchestrator module for ChefChat Pro with telemetry support."""
 
+import os
 from typing import List, Dict, Any, Optional, Callable
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage
@@ -60,6 +61,14 @@ PROVIDER_API_CONFIGS: Dict[AIProvider, Dict[str, str]] = {
     AIProvider.OLLAMA: {
         "base_url": "http://localhost:11434/v1",
         "default_model": "llama3.2",
+    },
+    AIProvider.SENSENOVA: {
+        "base_url": os.environ.get("CHEFCHAT_SENSENOVA_BASE_URL", "https://token.sensenova.ai/v1"),
+        "default_model": os.environ.get("CHEFCHAT_SENSENOVA_MODEL", "sensenova-model"),
+    },
+    AIProvider.CUSTOM: {
+        "base_url": os.environ.get("CHEFCHAT_CUSTOM_BASE_URL", "https://100milionseek.top/v1"),
+        "default_model": os.environ.get("CHEFCHAT_CUSTOM_MODEL", "deepseek-v4.1-flash-free"),
     },
 }
 
@@ -262,16 +271,16 @@ ALWAYS respond in Spanish.
         rag_only: bool = True,
         db_manager=None,  # For telemetry logging
         use_dspy: bool = False,  # Enable DSPy optimization
-        forced_agent_role: Optional[str] = None,
-        mostrar_alertas: bool = True,
+        forced_agent_role: Optional[str] = None,  # Agente elegido en la GUI
+        mostrar_alertas: bool = False,  # Mostrar alertas de caducidad en la respuesta
     ) -> None:
         self.provider = provider or ConfigManager.get_configured_provider() or AIProvider.OPENAI
         self.forced_agent_role = forced_agent_role
         self._mostrar_alertas = mostrar_alertas
         
-        # CRITICAL DEBUG LOG
+        # Depuracion
         import logging
-        logging.critical(
+        logging.debug(
             "ORCHESTRATOR INIT - provider param: %s, ConfigManager.get_configured_provider: %s, final self.provider: %s",
             provider,
             ConfigManager.get_configured_provider(),
@@ -290,10 +299,10 @@ ALWAYS respond in Spanish.
         if not self.api_key:
             # Try to get all providers to see what's available
             all_providers = ConfigManager.get_all_providers()
-            logging.critical(f"NO API KEY FOR {self.provider}! Available providers:")
+            logging.warning(f"NO API KEY FOR {self.provider}! Available providers:")
             for p in all_providers:
                 key = ConfigManager.get_api_key(p)
-                logging.critical(f"  - {p.value}: {'[SET]' if key else '[NOT SET]'} - Key length: {len(key) if key else 0}")
+                logging.debug(f"  - {p.value}: {'[SET]' if key else '[NOT SET]'} - Key length: {len(key) if key else 0}")
             
             raise ValueError(f"No API Key found for {self.provider.value}. Please configure it in Settings.")
         
@@ -357,8 +366,8 @@ ALWAYS respond in Spanish.
                     "Run: pip install openai"
                 ) from exc
             
-            # CRITICAL DEBUG: Log api_key and base_url before creating client
-            logging.critical(
+            # Depuracion: base_url antes de crear el cliente
+            logging.debug(
                 "Creating OpenAI client - api_key length: %d, base_url: %s",
                 len(self.api_key) if self.api_key else 0,
                 self.base_url,
@@ -374,7 +383,7 @@ ALWAYS respond in Spanish.
                 except ImportError:
                     client_kwargs["base_url"] = self.base_url
             
-            logging.critical(
+            logging.debug(
                 "client_kwargs: api_key=%d chars, base_url=%s",
                 len(self.api_key) if self.api_key else 0,
                 client_kwargs.get('base_url'),
@@ -382,8 +391,8 @@ ALWAYS respond in Spanish.
             
             client = OpenAI(**client_kwargs)
             
-            logging.critical("Client created: %s", client)
-            logging.critical("Client base_url: %s", client.base_url)
+            logging.debug("Client created: %s", client)
+            logging.debug("Client base_url: %s", client.base_url)
 
             from openai import OpenAI
             from langchain_openai import ChatOpenAI
@@ -403,7 +412,7 @@ ALWAYS respond in Spanish.
                 default_headers=openrouter_headers,
             )
             
-            logging.critical("ChatOpenAI created successfully: %s", self.llm)
+            logging.debug("ChatOpenAI created successfully: %s", self.llm)
 
     def _setup_tools(self) -> None:
         from agents.tools import crear_herramientas_operativas
@@ -569,6 +578,22 @@ ALWAYS respond in Spanish.
         tipo_operacion = "tool_call"
         
         try:
+            # RESPUESTA DIRECTA DESDE LA BASE: vencimientos, stock, mermas, personal.
+            # Va antes de la IA para que los datos sean siempre los reales.
+            if historial:
+                from agents.consulta_chat import responder_consulta
+                _consulta = responder_consulta(historial[-1]["contenido"])
+                if _consulta:
+                    return _consulta
+                from agents.menu_chat import responder_menu
+                _menu = responder_menu(historial[-1]["contenido"])
+                if _menu:
+                    return _menu
+                from agents.vencimientos import responder_datos
+                _directa = responder_datos(historial[-1]["contenido"])
+                if _directa:
+                    return _directa
+
             # ============================================================
             # FORCED AGENT ROUTING: Si el usuario seleccionó un agente
             # específico en la GUI, usarlo directamente.
@@ -593,8 +618,8 @@ ALWAYS respond in Spanish.
             ids_encontrados = re.findall(r'\b((?:SPO|SOP|BEB|ENS|POS|ENT|PLF|EVT)[-_]\d{2,4})\b', ultimo_mensaje.upper())
             
             import logging
-            logging.critical(f"ULTIMO_MENSAJE: {ultimo_mensaje[:100]}")
-            logging.critical(f"MATCH_ID: {match_id}")
+            logging.debug(f"ULTIMO_MENSAJE: {ultimo_mensaje[:100]}")
+            logging.debug(f"MATCH_ID: {match_id}")
             
             # ============================================================
             # PRIORIDAD 1: EXPORTACIÓN GENÉRICA (a excel/word/powerpoint)
@@ -662,8 +687,32 @@ ALWAYS respond in Spanish.
                 if callable(func):
                     respuesta = func(ultimo_mensaje)
                     tipo_operacion = "menu_semanal"
-                    logging.critical(f"MENU_SEMANAL: {respuesta[:100]}")
+                    logging.debug(f"MENU_SEMANAL: {respuesta[:100]}")
             
+            # ============================================================
+            # RAG DE DOCUMENTOS: manuales, protocolos y capacitaciones.
+            # Busca fragmentos (FTS5) y la IA responde SOLO con ellos, citando fuente.
+            # ============================================================
+            _claves_doc = ["capacit", "manual", "protocolo", "bpm", "buenas practicas", "documento", "alergen",
+                           "higiene", "lavar", "lavo", "contaminacion", "atencion al cliente", "mesero",
+                           "inocuidad", "zona de peligro", "induccion", "queja", "emergencia"]
+            if not respuesta:
+                from data import rag_docs
+                # Con palabra clave basta 2 coincidencias; sin ella se exigen 3 (evita robar otras consultas)
+                _con_clave = any(p in ultimo_mensaje_norm for p in _claves_doc)
+                _frags = rag_docs.buscar(ultimo_mensaje, k=4, min_raices=2 if _con_clave else 3)
+                if _frags:
+                    try:
+                        _out = self.llm.invoke([
+                            SystemMessage(content=rag_docs.SISTEMA),
+                            HumanMessage(content=f"Fragmentos:\n{rag_docs.contexto(_frags)}\n\nPregunta: {ultimo_mensaje}"),
+                        ])
+                        respuesta = getattr(_out, "content", str(_out))
+                    except Exception as _e:  # sin IA: mostrar el fragmento mas relevante
+                        logging.warning("RAG docs sin LLM: %s", _e)
+                        respuesta = f"{_frags[0]['texto']}\n\nFuente: {_frags[0]['documento']} > {_frags[0]['seccion']}"
+                    tipo_operacion = "rag_documentos"
+
             # ============================================================
             # PRIORIDAD 3: BUSCAR DOCUMENTOS (ANTES de buscar recetas)
             # ============================================================
@@ -724,7 +773,7 @@ ALWAYS respond in Spanish.
                         if len(contenido) > max_len:
                             respuesta += "\n...(contenido truncado)"
                     tipo_operacion = "buscar_documento"
-                    logging.critical(f"DOCUMENTOS: {respuesta[:100]}")
+                    logging.debug(f"DOCUMENTOS: {respuesta[:100]}")
                 else:
                     respuesta = f"No se encontraron documentos con: {termino}. Usa el boton [+] para cargar documentos."
 
@@ -762,7 +811,7 @@ ALWAYS respond in Spanish.
             es_reporte = any(p in ultimo_mensaje_norm for p in ["merma", "mermas", "informe", "reporte", "dashboard", "inventario", "caducar", "caducidad", "stock", "semanal", "semana", "documento", "capacitacion"])
             es_menu = es_menu and not es_reporte and not any(p in ultimo_mensaje_norm for p in ["menu semanal", "menu de la semana", "menu del dia"])
             
-            logging.critical(f"ES_MENU: {es_menu}")
+            logging.debug(f"ES_MENU: {es_menu}")
             
             if not respuesta and es_menu and self.db_manager:
                 from agents.tools import crear_herramientas_operativas
@@ -815,7 +864,7 @@ ALWAYS respond in Spanish.
                                 fecha_objetivo = fecha_objetivo.replace(year=hoy.year - 1)
                             dias = (hoy - fecha_objetivo).days + 1
                 
-                logging.critical(f"MERMAS_DETECT: dias={dias}")
+                logging.debug(f"MERMAS_DETECT: dias={dias}")
                 
                 if "excel" in ultimo_mensaje:
                     tool = next((t for t in tools if t.name == "enviar_reporte_mermas_a_excel"), None)
@@ -942,48 +991,62 @@ ALWAYS respond in Spanish.
             # ============================================================
             if not respuesta:
                 tipo_operacion = "chat_completion"
+                # La IA recibe los datos de la base y del RAG que tocan esta pregunta (recetas, proveedores, stock, manuales)
+                try:
+                    from agents.contexto import armar_contexto
+                    _ctx = armar_contexto(ultimo_mensaje)
+                    if _ctx:
+                        _pos = 0
+                        while _pos < len(messages) and isinstance(messages[_pos], SystemMessage):
+                            _pos += 1
+                        messages.insert(_pos, SystemMessage(content=_ctx))
+                except Exception as _e:  # el contexto es una ayuda: si falla, se sigue sin el
+                    logging.warning("Sin contexto de la base: %s", _e)
                 respuesta = self.llm.invoke(messages)
                 
-                logging.critical(f"LLM RESPONSE TYPE: {type(respuesta)}")
+                logging.debug(f"LLM RESPONSE TYPE: {type(respuesta)}")
                 
                 if hasattr(respuesta, "response_metadata"):
                     metadata = respuesta.response_metadata
-                    logging.critical(f"META KEYS: {metadata.keys() if hasattr(metadata, 'keys') else 'N/A'}")
-                    logging.critical(f"META: {str(metadata)[:500]}")
+                    logging.debug(f"META KEYS: {metadata.keys() if hasattr(metadata, 'keys') else 'N/A'}")
+                    logging.debug(f"META: {str(metadata)[:500]}")
                     
                     if "token_usage" in metadata:
                         usage = metadata["token_usage"]
                         input_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
                         output_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
-                        logging.critical(f"TOKENS (token_usage): input={input_tokens}, output={output_tokens}")
+                        logging.debug(f"TOKENS (token_usage): input={input_tokens}, output={output_tokens}")
                     elif "usage" in metadata:
                         usage = metadata["usage"]
                         input_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
                         output_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
-                        logging.critical(f"TOKENS (usage): input={input_tokens}, output={output_tokens}")
+                        logging.debug(f"TOKENS (usage): input={input_tokens}, output={output_tokens}")
                     elif "usage_metadata" in metadata:
                         usage = metadata["usage_metadata"]
                         input_tokens = usage.get("input_tokens", 0) or usage.get("prompt_tokens", 0)
                         output_tokens = usage.get("output_tokens", 0) or usage.get("completion_tokens", 0)
-                        logging.critical(f"TOKENS (usage_metadata): input={input_tokens}, output={output_tokens}")
+                        logging.debug(f"TOKENS (usage_metadata): input={input_tokens}, output={output_tokens}")
                     else:
-                        logging.critical(f"NO TOKEN USAGE FOUND IN METADATA")
+                        logging.debug(f"NO TOKEN USAGE FOUND IN METADATA")
                 elif hasattr(respuesta, "usage_metadata"):
                     usage = respuesta.usage_metadata
                     if usage:
                         input_tokens = usage.get("input_tokens", 0) or usage.get("prompt_tokens", 0)
                         output_tokens = usage.get("output_tokens", 0) or usage.get("completion_tokens", 0)
-                        logging.critical(f"TOKENS (usage_metadata attr): input={input_tokens}, output={output_tokens}")
+                        logging.debug(f"TOKENS (usage_metadata attr): input={input_tokens}, output={output_tokens}")
                 elif hasattr(respuesta, "usage"):
                     usage = respuesta.usage
                     if usage:
                         input_tokens = usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
                         output_tokens = usage.get("completion_tokens", 0) or usage.get("output_tokens", 0)
-                        logging.critical(f"TOKENS (usage attr): input={input_tokens}, output={output_tokens}")
+                        logging.debug(f"TOKENS (usage attr): input={input_tokens}, output={output_tokens}")
                 else:
-                    logging.critical(f"NO response_metadata ATTRIBUTE")
+                    logging.debug(f"NO response_metadata ATTRIBUTE")
                 
                 respuesta = str(respuesta.content) if hasattr(respuesta, "content") else str(respuesta)
+                if not respuesta.strip():  # nunca dejar la respuesta en blanco
+                    respuesta = ("No encontr? una respuesta para eso. Puedo ayudarte con vencimientos, inventario, mermas, "
+                                 "proveedores y precios, recetas (por nombre o ingrediente), men?s y manuales. Prueba con una de esas.")
             
         except (AttributeError, ImportError, ValueError, RuntimeError, TypeError, OSError, KeyError) as e:
             # Capture common, expected exception types while avoiding a broad
@@ -999,7 +1062,7 @@ ALWAYS respond in Spanish.
         costo_usd = calculate_cost(self.model_name, input_tokens, output_tokens)
         
         # Log to telemetry (async/silent)
-        logging.critical(f"TELEMETRY: model={self.model_name}, input_tokens={input_tokens}, output_tokens={output_tokens}, cost={costo_usd}")
+        logging.debug(f"TELEMETRY: model={self.model_name}, input_tokens={input_tokens}, output_tokens={output_tokens}, cost={costo_usd}")
         
         if self.db_manager:
             try:
@@ -1012,11 +1075,11 @@ ALWAYS respond in Spanish.
                     duracion=duration,
                     exito=success
                 )
-                logging.critical(f"TELEMETRY REGISTERED SUCCESSFULLY")
+                logging.debug(f"TELEMETRY REGISTERED SUCCESSFULLY")
             except Exception as e:
                 # Silent fail - telemetry is non-critical. Catching specific
                 # exceptions likely to be raised by telemetry/database ops.
-                logging.critical(f"TELEMETRY ERROR: {e}")
+                logging.warning(f"TELEMETRY ERROR: {e}")
                 pass
         
         # Detect HITL action from tool results
@@ -1406,7 +1469,7 @@ ALWAYS respond in Spanish.
 
     def _procesar_menu_por_ingredientes(self, ultimo_mensaje: str, tools: List[Tool]) -> str:
         import logging
-        logging.critical(f"_PROCESAR_MENU: ultimo_mensaje={ultimo_mensaje[:100]}")
+        logging.debug(f"_PROCESAR_MENU: ultimo_mensaje={ultimo_mensaje[:100]}")
         
         es_anti_desperdicio = any(p in ultimo_mensaje for p in ["sobrante", "caducar", "desperdicio", "sobro"])
         if es_anti_desperdicio:
@@ -1419,7 +1482,7 @@ ALWAYS respond in Spanish.
                         return str(resultado)
 
         menu_tool = next((t for t in tools if t.name == "sugerir_menu_por_ingredientes"), None)
-        logging.critical(f"MENU_TOOL: {menu_tool}")
+        logging.debug(f"MENU_TOOL: {menu_tool}")
         if not menu_tool:
             return ""
 
@@ -1495,7 +1558,7 @@ ALWAYS respond in Spanish.
                 ingredientes_texto = " ".join(ingredientes_filtrados)
         
         # Logging para debug
-        logging.critical(f"INGREDIENTES_EXTRAIDOS: '{ingredientes_texto}' (genérico={all(p.lower() in generic_words for p in ingredientes_texto.split()) if ingredientes_texto else True})")
+        logging.debug(f"INGREDIENTES_EXTRAIDOS: '{ingredientes_texto}' (genérico={all(p.lower() in generic_words for p in ingredientes_texto.split()) if ingredientes_texto else True})")
 
         if ingredientes_texto:
             func = getattr(menu_tool, "func", None)
@@ -1509,20 +1572,20 @@ ALWAYS respond in Spanish.
             todas_genericas = generic_words.union(tipo_plato_words)
             es_generico = len(ingredientes_lista) == 0 or all(p.lower() in todas_genericas for p in ingredientes_lista)
             
-            logging.critical(f"GENÉRICO_CHECK: ingredientes='{ingredientes_texto}', lista={ingredientes_lista}, es_generico={es_generico}")
+            logging.debug(f"GENÉRICO_CHECK: ingredientes='{ingredientes_texto}', lista={ingredientes_lista}, es_generico={es_generico}")
             
             if es_generico:
                 # Usar menú anti-desperdicio
-                logging.critical("GENÉRICO_DETECTADO: Activando menú anti-desperdicio")
+                logging.debug("GENÉRICO_DETECTADO: Activando menú anti-desperdicio")
                 anti_tool = next((t for t in tools if t.name == "menu_anti_desperdicio"), None)
                 if anti_tool:
                     anti_func = getattr(anti_tool, "func", None)
                     if callable(anti_func):
                         resultado = anti_func()
-                        logging.critical(f"ANTI_DESPERDICIO_RESULT: {resultado[:100] if resultado else 'None'}")
+                        logging.debug(f"ANTI_DESPERDICIO_RESULT: {resultado[:100] if resultado else 'None'}")
                         return f"📋 **Menú Sugerido (basado en inventario):**\n\n{resultado}"
                 else:
-                    logging.critical("ANTI_DESPERDICIO_TOOL: No encontrada")
+                    logging.debug("ANTI_DESPERDICIO_TOOL: No encontrada")
             
             resultado = func(ingredientes_texto)
             if resultado is None:
