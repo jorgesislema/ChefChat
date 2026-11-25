@@ -50,7 +50,6 @@ ChefChat/
 ├── scripts/                # Utilidades y datos de demostración (ver abajo)
 ├── tests/
 ├── data_source/            # Recetas, catálogo y lotes en CSV
-├── docs/                   # Planes y diseño (exámenes, etapas, balance del turno)
 └── chefchat.db             # Base SQLite (no se sube a git)
 ```
 
@@ -186,7 +185,7 @@ Las pruebas de la app de escritorio usan una IA falsa: no llaman a ningún prove
 
 ## Balance del turno (kilos y unidades)
 
-Sirve para ver la merma que nadie anota (lo que queda en la máquina, se riega o se come el personal). Detalle en `docs/PLAN_BALANCE_TURNO.md`.
+Sirve para ver la merma que nadie anota (lo que queda en la máquina, se riega o se come el personal).
 
 - **La cuenta**: `entró = salió bueno + pérdida normal + anotado + sin explicar`. Entró = lo que bodega entregó menos lo devuelto. Salió bueno = unidades × peso por unidad (o el peso de la receta). Anotado = merma pesada + comida del personal + residuo de limpieza + muestras. **Sin explicar positivo = falta.**
 - **Semáforo**: Alarma si lo sin explicar pasa la tolerancia de la receta (2 % por defecto); Cerca si pasa el 75 % de la tolerancia.
@@ -211,12 +210,6 @@ Sirve para ver la merma que nadie anota (lo que queda en la máquina, se riega o
 - 15 lotes del inventario apuntan a productos que no están en el catálogo.
 - Quedan 3 preguntas de examen «pendientes»: se aprueban en el Panel del dueño.
 - La app de escritorio es la versión anterior: lo nuevo (compras, conteo, turno, balance) solo está en la web.
-
-## Documentación
-
-- `docs/PLAN_ETAPAS.md`: qué pidió el cliente y en qué orden se hizo.
-- `docs/PLAN_BALANCE_TURNO.md`: balance del turno en kilos y unidades.
-- `docs/DISENO_EXAMENES.md`: diseño del módulo de exámenes.
 
 ## Autor
 
