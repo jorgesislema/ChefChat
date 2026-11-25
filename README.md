@@ -1,5 +1,7 @@
 # ChefChat Pro 🍳
 
+![Pantalla de inicio de ChefChat: lotes que vencen, costo de mermas y asistente](imagenes/portada.png)
+
 Asistente con IA para el dueño de un restaurante. Controla inventario y vencimientos, mermas, capacitaciones con exámenes y documentos. Responde con los datos reales del negocio y cita los manuales.
 
 Se usa de dos formas:
