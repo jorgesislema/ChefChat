@@ -23,6 +23,7 @@ dashboard_sobrantes_*.xlsx
 plantillas/
 
 # Documentos internos de trabajo
+docs/
 docs_internos/
 architecture.md
 code_and_tests.md
