@@ -28,7 +28,8 @@ def main_window() -> Generator[MainWindow, None, None]:
 @pytest.fixture
 def window_with_mocked_api() -> Generator[MainWindow, None, None]:
     """Create a MainWindow with a mocked ConfigManager for testing."""
-    with patch("gui.main_window.ConfigManager") as mock_config:
+    # Orchestrator y Worker falsos: la prueba NUNCA debe llamar a una IA real (ni gastar en un proveedor de pago)
+    with patch("gui.main_window.ConfigManager") as mock_config, patch("gui.main_window.Orchestrator"), patch("gui.main_window.Worker"):
         # Setup mock for API key
         mock_config.get_openrouter_key.return_value = "test_key_12345678901234567890"
         mock_config.get_sandbox_path.return_value = r"C:\Temp\ChefChat_Sandbox"
