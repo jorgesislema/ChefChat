@@ -80,3 +80,29 @@ def mock_orchestrator() -> MagicMock:
     mock.generar_respuesta.return_value = "Respuesta de prueba del LLM"
     mock.clasificar_intencion.return_value = "rag"
     return mock
+
+
+# ---------------------------------------------------------------------------
+# Guarda: las pruebas de estos archivos trabajan sobre una COPIA de la base.
+# Si alguna toca chefchat.db (la base real), la prueba falla para que se note.
+# ---------------------------------------------------------------------------
+import hashlib
+from pathlib import Path
+
+_BASE_REAL = Path(__file__).resolve().parent.parent / "chefchat.db"
+_PROTEGIDOS = ("test_balance", "test_conteos", "test_compras_turnos", "test_edicion_analisis", "test_consulta_carga", "test_proveedores_recetas", "test_menu",
+               "test_menu_chat_api", "test_etapa_b", "test_examenes", "test_rag_docs", "test_api")
+
+
+def _huella() -> str:
+    return hashlib.sha1(_BASE_REAL.read_bytes()).hexdigest() if _BASE_REAL.exists() else ""
+
+
+@pytest.fixture(autouse=True)
+def _no_toca_la_base_real(request):
+    if request.module.__name__.rsplit(".", 1)[-1] not in _PROTEGIDOS:
+        yield
+        return
+    antes = _huella()
+    yield
+    assert _huella() == antes, "Esta prueba modificó chefchat.db (la base real). Debe usar una copia."

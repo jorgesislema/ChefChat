@@ -363,10 +363,10 @@ class RAGStore:
                         nombre_producto = ((row.get('nombre') or row.get('Nombre')) or '').strip().title()
                         with db_manager.get_connection() as conn:
                             cursor = conn.cursor()
-                            cursor.execute("SELECT id FROM Catalogo WHERE nombre = ?", (nombre_producto,))
-                            prod_row = cursor.fetchone()
-                            if prod_row:
-                                producto_id = str(prod_row[0])
+                            from core.normalizar import buscar_producto_id
+                            _pid = buscar_producto_id(conn, nombre_producto)
+                            if _pid:
+                                producto_id = str(_pid)
                     
                     fecha_ingreso = (row.get('fecha_ingreso') or row.get('Fecha_Ingreso') or 
                                     row.get('fecha') or datetime.now().strftime('%Y-%m-%d'))
@@ -480,10 +480,12 @@ class RAGStore:
                     # Verificar duplicado por nombre
                     with db_manager.get_connection() as conn:
                         cursor = conn.cursor()
+                        from core.normalizar import buscar_producto_id
+                        _pid = buscar_producto_id(conn, nombre)
                         cursor.execute("""
                             SELECT id, vida_util_dias, categoria 
-                            FROM Catalogo WHERE nombre = ?
-                        """, (nombre,))
+                            FROM Catalogo WHERE id = ?
+                        """, (_pid,))
                         
                         existente = cursor.fetchone()
                         

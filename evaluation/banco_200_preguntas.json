@@ -1,0 +1,2387 @@
+{
+ "fecha_ancla": "2026-11-24",
+ "preguntas": [
+  {
+   "tema": "vence_diciembre",
+   "pregunta": "¿Qué productos vencen en diciembre?",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Harina de Maiz",
+    "Huevo",
+    "Jabon Para Manos",
+    "Jamon",
+    "Limon",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P001"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "¿Qué productos vencen en 1 semana?",
+   "debe_contener": [
+    "Avena En Hojuelas",
+    "Crema Para Batir",
+    "Harina",
+    "Leche Entera",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Pato",
+    "Pollo"
+   ],
+   "id": "P002"
+  },
+  {
+   "tema": "ya_vencidos",
+   "pregunta": "¿Qué productos ya están vencidos?",
+   "debe_contener": [
+    "10M Platos",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla Morada",
+    "Champinon Portobello",
+    "Chile Serrano",
+    "Cilantro Fresco",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Esparrago Verde"
+   ],
+   "id": "P003"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Calabaza Italiana?",
+   "debe_contener": [
+    "2026-12-16"
+   ],
+   "id": "P004"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Calabaza Italiana tengo en inventario?",
+   "debe_contener": [
+    "58.6"
+   ],
+   "id": "P005"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Aceites vence en diciembre?",
+   "debe_contener": [
+    "Aceite de Oliva"
+   ],
+   "id": "P006"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Sobrante del dia?",
+   "debe_contener": [
+    "59.35"
+   ],
+   "id": "P007"
+  },
+  {
+   "tema": "personal_cargo",
+   "pregunta": "¿Cuántos Ayudante Cocina hay?",
+   "debe_contener": [
+    "2"
+   ],
+   "id": "P008"
+  },
+  {
+   "tema": "personal_turno",
+   "pregunta": "¿Cuántas personas trabajan en el turno matutino?",
+   "debe_contener": [
+    "5"
+   ],
+   "id": "P009"
+  },
+  {
+   "tema": "vence_diciembre",
+   "pregunta": "Dime los productos que caducan en diciembre",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Harina de Maiz",
+    "Huevo",
+    "Jabon Para Manos",
+    "Jamon",
+    "Limon",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P010"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "Qué se vence de hoy a 1 semanas",
+   "debe_contener": [
+    "Avena En Hojuelas",
+    "Crema Para Batir",
+    "Harina",
+    "Leche Entera",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Pato",
+    "Pollo"
+   ],
+   "id": "P011"
+  },
+  {
+   "tema": "ya_vencidos",
+   "pregunta": "¿Qué tengo que botar por vencido?",
+   "debe_contener": [
+    "10M Platos",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla Morada",
+    "Champinon Portobello",
+    "Chile Serrano",
+    "Cilantro Fresco",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Esparrago Verde"
+   ],
+   "id": "P012"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Calabaza Italiana?",
+   "debe_contener": [
+    "2026-12-16"
+   ],
+   "id": "P013"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Chile Serrano tengo en inventario?",
+   "debe_contener": [
+    "62.5"
+   ],
+   "id": "P014"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Bebidas vence en diciembre?",
+   "debe_contener": [
+    "no"
+   ],
+   "id": "P015"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Descongelacion inadecuada?",
+   "debe_contener": [
+    "31.11"
+   ],
+   "id": "P016"
+  },
+  {
+   "tema": "personal_cargo",
+   "pregunta": "¿Cuántos Cocinera hay?",
+   "debe_contener": [
+    "3"
+   ],
+   "id": "P017"
+  },
+  {
+   "tema": "personal_turno",
+   "pregunta": "¿Cuántas personas trabajan en el turno nocturno?",
+   "debe_contener": [
+    "1"
+   ],
+   "id": "P018"
+  },
+  {
+   "tema": "vence_diciembre",
+   "pregunta": "¿Qué se me vence en diciembre?",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Harina de Maiz",
+    "Huevo",
+    "Jabon Para Manos",
+    "Jamon",
+    "Limon",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P019"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "¿Qué productos vencen en 2 semanas?",
+   "debe_contener": [
+    "Aceite de Oliva",
+    "Avena En Hojuelas",
+    "Cebolla",
+    "Chile Serrano",
+    "Cloruro de Sodio",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Harina",
+    "Huevo",
+    "Leche Entera",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Remolacha",
+    "Sulfato de Cobre",
+    "Vinagre Blanco"
+   ],
+   "id": "P020"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Chile Serrano?",
+   "debe_contener": [
+    "2026-12-02"
+   ],
+   "id": "P021"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Aceite Vegetal tengo en inventario?",
+   "debe_contener": [
+    "84.7"
+   ],
+   "id": "P022"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Carnes vence en diciembre?",
+   "debe_contener": [
+    "Pato",
+    "Pescado"
+   ],
+   "id": "P023"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Sobre-maduracion?",
+   "debe_contener": [
+    "28.27"
+   ],
+   "id": "P024"
+  },
+  {
+   "tema": "personal_cargo",
+   "pregunta": "¿Cuántos Cocinero hay?",
+   "debe_contener": [
+    "1"
+   ],
+   "id": "P025"
+  },
+  {
+   "tema": "personal_turno",
+   "pregunta": "¿Cuántas personas trabajan en el turno vespertino?",
+   "debe_contener": [
+    "4"
+   ],
+   "id": "P026"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "Qué se vence de hoy a 2 semanas",
+   "debe_contener": [
+    "Aceite de Oliva",
+    "Avena En Hojuelas",
+    "Cebolla",
+    "Chile Serrano",
+    "Cloruro de Sodio",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Harina",
+    "Huevo",
+    "Leche Entera",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Remolacha",
+    "Sulfato de Cobre",
+    "Vinagre Blanco"
+   ],
+   "id": "P027"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Chile Serrano?",
+   "debe_contener": [
+    "2026-12-02"
+   ],
+   "id": "P028"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Vino Tinto tengo en inventario?",
+   "debe_contener": [
+    "70.7"
+   ],
+   "id": "P029"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Cereales vence en diciembre?",
+   "debe_contener": [
+    "Arroz Integral"
+   ],
+   "id": "P030"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Se echo a perder?",
+   "debe_contener": [
+    "22.03"
+   ],
+   "id": "P031"
+  },
+  {
+   "tema": "personal_cargo",
+   "pregunta": "¿Cuántos Lavaplatos hay?",
+   "debe_contener": [
+    "1"
+   ],
+   "id": "P032"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "¿Qué productos vencen en 3 semanas?",
+   "debe_contener": [
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Avena En Hojuelas",
+    "Cebolla",
+    "Chile Serrano",
+    "Cloruro de Sodio",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Harina",
+    "Huevo",
+    "Leche Entera",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Papa",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Remolacha",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P033"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Aceite Vegetal?",
+   "debe_contener": [
+    "2027-01-04"
+   ],
+   "id": "P034"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Yuca Fresca tengo en inventario?",
+   "debe_contener": [
+    "41.1"
+   ],
+   "id": "P035"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Cocina vence en diciembre?",
+   "debe_contener": [
+    "no"
+   ],
+   "id": "P036"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por No paso control de calidad?",
+   "debe_contener": [
+    "21.65"
+   ],
+   "id": "P037"
+  },
+  {
+   "tema": "personal_cargo",
+   "pregunta": "¿Cuántos Pastelera hay?",
+   "debe_contener": [
+    "1"
+   ],
+   "id": "P038"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "Qué se vence de hoy a 3 semanas",
+   "debe_contener": [
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Avena En Hojuelas",
+    "Cebolla",
+    "Chile Serrano",
+    "Cloruro de Sodio",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Harina",
+    "Huevo",
+    "Leche Entera",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Papa",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Remolacha",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P039"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Aceite Vegetal?",
+   "debe_contener": [
+    "2027-01-04"
+   ],
+   "id": "P040"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Platano Maduro tengo en inventario?",
+   "debe_contener": [
+    "44.3"
+   ],
+   "id": "P041"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Condimentos vence en diciembre?",
+   "debe_contener": [
+    "Azúcar Refinada",
+    "Cloruro de Sodio",
+    "Pimienta Negra",
+    "Sal Marina",
+    "Vinagre Blanco"
+   ],
+   "id": "P042"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Golpeado?",
+   "debe_contener": [
+    "21.41"
+   ],
+   "id": "P043"
+  },
+  {
+   "tema": "personal_cargo",
+   "pregunta": "¿Cuántos Repostera hay?",
+   "debe_contener": [
+    "1"
+   ],
+   "id": "P044"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "¿Qué productos vencen en 4 semanas?",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Avena En Hojuelas",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloruro de Sodio",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Esparrago Verde",
+    "Harina",
+    "Huevo",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Papa",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P045"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Vino Tinto?",
+   "debe_contener": [
+    "2027-01-13"
+   ],
+   "id": "P046"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Arroz Integral tengo en inventario?",
+   "debe_contener": [
+    "61.3"
+   ],
+   "id": "P047"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Embutidos vence en diciembre?",
+   "debe_contener": [
+    "Jamon"
+   ],
+   "id": "P048"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Oxidacion?",
+   "debe_contener": [
+    "21.21"
+   ],
+   "id": "P049"
+  },
+  {
+   "tema": "personal_cargo",
+   "pregunta": "¿Cuántos Steward hay?",
+   "debe_contener": [
+    "1"
+   ],
+   "id": "P050"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "Qué se vence de hoy a 4 semanas",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Avena En Hojuelas",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloruro de Sodio",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Esparrago Verde",
+    "Harina",
+    "Huevo",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Papa",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P051"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Vino Tinto?",
+   "debe_contener": [
+    "2027-01-13"
+   ],
+   "id": "P052"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Pulpo Fresco tengo en inventario?",
+   "debe_contener": [
+    "47.2"
+   ],
+   "id": "P053"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Frutas vence en diciembre?",
+   "debe_contener": [
+    "Limon",
+    "Platano Maduro"
+   ],
+   "id": "P054"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Caduco?",
+   "debe_contener": [
+    "15.33"
+   ],
+   "id": "P055"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "¿Qué productos vencen en 5 semanas?",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Avena En Hojuelas",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Harina",
+    "Harina de Maiz",
+    "Huevo",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P056"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Yuca Fresca?",
+   "debe_contener": [
+    "2026-12-11"
+   ],
+   "id": "P057"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Jabon Para Manos tengo en inventario?",
+   "debe_contener": [
+    "54.3"
+   ],
+   "id": "P058"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría General vence en diciembre?",
+   "debe_contener": [
+    "10M Platos",
+    "Remolacha"
+   ],
+   "id": "P059"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Sobreproduccion?",
+   "debe_contener": [
+    "13.66"
+   ],
+   "id": "P060"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "Qué se vence de hoy a 5 semanas",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite de Oliva",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Avena En Hojuelas",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Harina",
+    "Harina de Maiz",
+    "Huevo",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Palta",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P061"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Yuca Fresca?",
+   "debe_contener": [
+    "2026-12-11"
+   ],
+   "id": "P062"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Pasta Seca tengo en inventario?",
+   "debe_contener": [
+    "75.4"
+   ],
+   "id": "P063"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Granos vence en diciembre?",
+   "debe_contener": [
+    "no"
+   ],
+   "id": "P064"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Cambio de color?",
+   "debe_contener": [
+    "12"
+   ],
+   "id": "P065"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "¿Qué productos vencen en 6 semanas?",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite Vegetal",
+    "Aceite de Oliva",
+    "Arroz",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Avena En Hojuelas",
+    "Azucar Glass",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Filete de Merluza",
+    "Harina",
+    "Harina de Maiz",
+    "Huevo",
+    "Huevos Extra",
+    "Jabon Industrial",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Limon",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Naranja",
+    "Palta",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P066"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Platano Maduro?",
+   "debe_contener": [
+    "2026-12-03"
+   ],
+   "id": "P067"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Esparragos Blancos tengo en inventario?",
+   "debe_contener": [
+    "28.6"
+   ],
+   "id": "P068"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Hierbas vence en diciembre?",
+   "debe_contener": [
+    "no"
+   ],
+   "id": "P069"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Excedente de buffet?",
+   "debe_contener": [
+    "11.56"
+   ],
+   "id": "P070"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "Qué se vence de hoy a 6 semanas",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite Vegetal",
+    "Aceite de Oliva",
+    "Arroz",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Avena En Hojuelas",
+    "Azucar Glass",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Filete de Merluza",
+    "Harina",
+    "Harina de Maiz",
+    "Huevo",
+    "Huevos Extra",
+    "Jabon Industrial",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Limon",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Naranja",
+    "Palta",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Vinagre Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P071"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Platano Maduro?",
+   "debe_contener": [
+    "2026-12-03"
+   ],
+   "id": "P072"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Arroz Basmati tengo en inventario?",
+   "debe_contener": [
+    "123.5"
+   ],
+   "id": "P073"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Limpieza vence en diciembre?",
+   "debe_contener": [
+    "Cloro Granulado",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Jabon Para Manos",
+    "Sulfato de Cobre"
+   ],
+   "id": "P074"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Error de calculo en porciones?",
+   "debe_contener": [
+    "10.09"
+   ],
+   "id": "P075"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "¿Qué productos vencen en 7 semanas?",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite Vegetal",
+    "Aceite de Oliva",
+    "Arroz",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Avena En Hojuelas",
+    "Azucar Glass",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Cebolla Morada",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Filete de Merluza",
+    "Harina",
+    "Harina de Maiz",
+    "Harina de Trigo",
+    "Huevo",
+    "Huevo de Codorniz",
+    "Huevos Extra",
+    "Jabon Industrial",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Limon",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Naranja",
+    "Palta",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Tomate Cherry",
+    "Vinagre Blanco",
+    "Vino Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P076"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Arroz Integral?",
+   "debe_contener": [
+    "2026-12-24"
+   ],
+   "id": "P077"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Esparrago Verde tengo en inventario?",
+   "debe_contener": [
+    "30.1"
+   ],
+   "id": "P078"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Lácteos vence en diciembre?",
+   "debe_contener": [
+    "Crema Para Batir",
+    "Mantequilla Sin Sal",
+    "Queso Crema"
+   ],
+   "id": "P079"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Mal olor?",
+   "debe_contener": [
+    "9.58"
+   ],
+   "id": "P080"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "Qué se vence de hoy a 7 semanas",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite Vegetal",
+    "Aceite de Oliva",
+    "Arroz",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Avena En Hojuelas",
+    "Azucar Glass",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Cebolla Morada",
+    "Chile Serrano",
+    "Cilantro",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Filete de Merluza",
+    "Harina",
+    "Harina de Maiz",
+    "Harina de Trigo",
+    "Huevo",
+    "Huevo de Codorniz",
+    "Huevos Extra",
+    "Jabon Industrial",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Limon",
+    "Limon Persa",
+    "Mantequilla Sin Sal",
+    "Naranja",
+    "Palta",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Tomate Cherry",
+    "Vinagre Blanco",
+    "Vino Blanco",
+    "Yuca Fresca"
+   ],
+   "id": "P081"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Arroz Integral?",
+   "debe_contener": [
+    "2026-12-24"
+   ],
+   "id": "P082"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Vinagre Blanco tengo en inventario?",
+   "debe_contener": [
+    "48.8"
+   ],
+   "id": "P083"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Mariscos vence en diciembre?",
+   "debe_contener": [
+    "Camaron Jumbo",
+    "Pulpo Fresco"
+   ],
+   "id": "P084"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Se cayo al piso?",
+   "debe_contener": [
+    "6.21"
+   ],
+   "id": "P085"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "¿Qué productos vencen en 8 semanas?",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite Vegetal",
+    "Aceite de Oliva",
+    "Arroz",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Avena En Hojuelas",
+    "Azucar Glass",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Cebolla Morada",
+    "Champinon Portobello",
+    "Chile Serrano",
+    "Cilantro",
+    "Cilantro Fresco",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Filete de Merluza",
+    "Harina",
+    "Harina de Maiz",
+    "Harina de Trigo",
+    "Huevo",
+    "Huevo de Codorniz",
+    "Huevos Extra",
+    "Jabon Industrial",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Limon",
+    "Limon Persa",
+    "Lomo",
+    "Mantequilla Sin Sal",
+    "Naranja",
+    "Palta",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Tomate Cherry",
+    "Vinagre Blanco",
+    "Vino Blanco",
+    "Vino Tinto",
+    "Yuca Fresca"
+   ],
+   "id": "P086"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Pulpo Fresco?",
+   "debe_contener": [
+    "2026-12-09"
+   ],
+   "id": "P087"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Camaron Jumbo tengo en inventario?",
+   "debe_contener": [
+    "43"
+   ],
+   "id": "P088"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Panaderia vence en diciembre?",
+   "debe_contener": [
+    "no"
+   ],
+   "id": "P089"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Se quemo en coccion?",
+   "debe_contener": [
+    "5.24"
+   ],
+   "id": "P090"
+  },
+  {
+   "tema": "vence_semanas",
+   "pregunta": "Qué se vence de hoy a 8 semanas",
+   "debe_contener": [
+    "10M Platos",
+    "Aceite Vegetal",
+    "Aceite de Oliva",
+    "Arroz",
+    "Arroz Basmati",
+    "Arroz Integral",
+    "Avena En Hojuelas",
+    "Azucar Glass",
+    "Azúcar Refinada",
+    "Calabaza Italiana",
+    "Camaron Jumbo",
+    "Cebolla",
+    "Cebolla Morada",
+    "Champinon Portobello",
+    "Chile Serrano",
+    "Cilantro",
+    "Cilantro Fresco",
+    "Cloro Granulado",
+    "Cloruro de Sodio",
+    "Costilla de Cerdo",
+    "Crema Para Batir",
+    "Desengrasante Industrial",
+    "Desinfectante Pisos",
+    "Detergente Lavaplatos",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Filete de Merluza",
+    "Harina",
+    "Harina de Maiz",
+    "Harina de Trigo",
+    "Huevo",
+    "Huevo de Codorniz",
+    "Huevos Extra",
+    "Jabon Industrial",
+    "Jabon Para Manos",
+    "Jamon",
+    "Leche Entera",
+    "Limon",
+    "Limon Persa",
+    "Lomo",
+    "Mantequilla Sin Sal",
+    "Naranja",
+    "Palta",
+    "Papa",
+    "Pasta Seca",
+    "Pato",
+    "Pechuga de Pavo",
+    "Pescado",
+    "Pimienta Negra",
+    "Platano Maduro",
+    "Pollo",
+    "Pollo Pechuga",
+    "Pulpo Fresco",
+    "Queso Crema",
+    "Remolacha",
+    "Sal Marina",
+    "Salmón Noruego",
+    "Sulfato de Cobre",
+    "Tomate",
+    "Tomate Cherry",
+    "Vinagre Blanco",
+    "Vino Blanco",
+    "Vino Tinto",
+    "Yuca Fresca"
+   ],
+   "id": "P091"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Pulpo Fresco?",
+   "debe_contener": [
+    "2026-12-09"
+   ],
+   "id": "P092"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Azucar Glass tengo en inventario?",
+   "debe_contener": [
+    "77.9"
+   ],
+   "id": "P093"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Pescados vence en diciembre?",
+   "debe_contener": [
+    "Salmón Noruego"
+   ],
+   "id": "P094"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Excedio vida util?",
+   "debe_contener": [
+    "4.47"
+   ],
+   "id": "P095"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Jabon Para Manos?",
+   "debe_contener": [
+    "2026-12-18"
+   ],
+   "id": "P096"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Limon Persa tengo en inventario?",
+   "debe_contener": [
+    "71"
+   ],
+   "id": "P097"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Proteinas vence en diciembre?",
+   "debe_contener": [
+    "Costilla de Cerdo",
+    "Huevo",
+    "Pechuga de Pavo",
+    "Pollo Pechuga"
+   ],
+   "id": "P098"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Error de preparacion?",
+   "debe_contener": [
+    "2.28"
+   ],
+   "id": "P099"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Jabon Para Manos?",
+   "debe_contener": [
+    "2026-12-18"
+   ],
+   "id": "P100"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Jabon Industrial tengo en inventario?",
+   "debe_contener": [
+    "47.5"
+   ],
+   "id": "P101"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Secos vence en diciembre?",
+   "debe_contener": [
+    "Arroz Basmati",
+    "Harina de Maiz",
+    "Pasta Seca"
+   ],
+   "id": "P102"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por No se vendio?",
+   "debe_contener": [
+    "0.83"
+   ],
+   "id": "P103"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Pasta Seca?",
+   "debe_contener": [
+    "2026-12-28"
+   ],
+   "id": "P104"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Champinon Portobello tengo en inventario?",
+   "debe_contener": [
+    "22.4"
+   ],
+   "id": "P105"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Vegetales vence en diciembre?",
+   "debe_contener": [
+    "Calabaza Italiana",
+    "Cebolla",
+    "Chile Serrano",
+    "Esparrago Verde",
+    "Esparragos Blancos",
+    "Limon Persa",
+    "Papa",
+    "Tomate",
+    "Yuca Fresca"
+   ],
+   "id": "P106"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por Reportado como merma?",
+   "debe_contener": [
+    "0"
+   ],
+   "id": "P107"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Pasta Seca?",
+   "debe_contener": [
+    "2026-12-28"
+   ],
+   "id": "P108"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Pimienta Negra tengo en inventario?",
+   "debe_contener": [
+    "73.5"
+   ],
+   "id": "P109"
+  },
+  {
+   "tema": "categoria_diciembre",
+   "pregunta": "¿Qué de la categoría Verduras vence en diciembre?",
+   "debe_contener": [
+    "Cilantro"
+   ],
+   "id": "P110"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por 3 kg de pan se echo a perder?",
+   "debe_contener": [
+    "0"
+   ],
+   "id": "P111"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Esparragos Blancos?",
+   "debe_contener": [
+    "2026-12-25"
+   ],
+   "id": "P112"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Desinfectante Pisos tengo en inventario?",
+   "debe_contener": [
+    "40.1"
+   ],
+   "id": "P113"
+  },
+  {
+   "tema": "mermas_motivo",
+   "pregunta": "¿Cuánto costó la merma por 12 kilos de jugo sobra?",
+   "debe_contener": [
+    "0"
+   ],
+   "id": "P114"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Esparragos Blancos?",
+   "debe_contener": [
+    "2026-12-25"
+   ],
+   "id": "P115"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Crema Para Batir tengo en inventario?",
+   "debe_contener": [
+    "62.8"
+   ],
+   "id": "P116"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Arroz Basmati?",
+   "debe_contener": [
+    "2026-12-15"
+   ],
+   "id": "P117"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Avena En Hojuelas tengo en inventario?",
+   "debe_contener": [
+    "114.4"
+   ],
+   "id": "P118"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Arroz Basmati?",
+   "debe_contener": [
+    "2026-12-15"
+   ],
+   "id": "P119"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Pollo Pechuga tengo en inventario?",
+   "debe_contener": [
+    "82.1"
+   ],
+   "id": "P120"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Esparrago Verde?",
+   "debe_contener": [
+    "2026-12-19"
+   ],
+   "id": "P121"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Tomate Cherry tengo en inventario?",
+   "debe_contener": [
+    "84.7"
+   ],
+   "id": "P122"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Esparrago Verde?",
+   "debe_contener": [
+    "2026-12-19"
+   ],
+   "id": "P123"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Salmón Noruego tengo en inventario?",
+   "debe_contener": [
+    "24.9"
+   ],
+   "id": "P124"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Vinagre Blanco?",
+   "debe_contener": [
+    "2026-12-03"
+   ],
+   "id": "P125"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Leche Entera tengo en inventario?",
+   "debe_contener": [
+    "67"
+   ],
+   "id": "P126"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Vinagre Blanco?",
+   "debe_contener": [
+    "2026-12-03"
+   ],
+   "id": "P127"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Huevos Extra tengo en inventario?",
+   "debe_contener": [
+    "145.1"
+   ],
+   "id": "P128"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Camaron Jumbo?",
+   "debe_contener": [
+    "2026-12-27"
+   ],
+   "id": "P129"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Queso Crema tengo en inventario?",
+   "debe_contener": [
+    "39.7"
+   ],
+   "id": "P130"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Camaron Jumbo?",
+   "debe_contener": [
+    "2026-12-27"
+   ],
+   "id": "P131"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Cebolla Morada tengo en inventario?",
+   "debe_contener": [
+    "58.1"
+   ],
+   "id": "P132"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Azucar Glass?",
+   "debe_contener": [
+    "2027-01-01"
+   ],
+   "id": "P133"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Cilantro Fresco tengo en inventario?",
+   "debe_contener": [
+    "43.6"
+   ],
+   "id": "P134"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Azucar Glass?",
+   "debe_contener": [
+    "2027-01-01"
+   ],
+   "id": "P135"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Mantequilla Sin Sal tengo en inventario?",
+   "debe_contener": [
+    "73.3"
+   ],
+   "id": "P136"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Limon Persa?",
+   "debe_contener": [
+    "2026-12-28"
+   ],
+   "id": "P137"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Cloro Granulado tengo en inventario?",
+   "debe_contener": [
+    "71"
+   ],
+   "id": "P138"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Limon Persa?",
+   "debe_contener": [
+    "2026-12-28"
+   ],
+   "id": "P139"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Desengrasante Industrial tengo en inventario?",
+   "debe_contener": [
+    "73.2"
+   ],
+   "id": "P140"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Jabon Industrial?",
+   "debe_contener": [
+    "2027-01-01"
+   ],
+   "id": "P141"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Sal Marina tengo en inventario?",
+   "debe_contener": [
+    "62"
+   ],
+   "id": "P142"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Jabon Industrial?",
+   "debe_contener": [
+    "2027-01-01"
+   ],
+   "id": "P143"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Azúcar Refinada tengo en inventario?",
+   "debe_contener": [
+    "43.8"
+   ],
+   "id": "P144"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Champinon Portobello?",
+   "debe_contener": [
+    "2027-01-17"
+   ],
+   "id": "P145"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Pato tengo en inventario?",
+   "debe_contener": [
+    "8.9"
+   ],
+   "id": "P146"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Champinon Portobello?",
+   "debe_contener": [
+    "2027-01-17"
+   ],
+   "id": "P147"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Naranja tengo en inventario?",
+   "debe_contener": [
+    "16.9"
+   ],
+   "id": "P148"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Pimienta Negra?",
+   "debe_contener": [
+    "2026-12-02"
+   ],
+   "id": "P149"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Arroz tengo en inventario?",
+   "debe_contener": [
+    "74"
+   ],
+   "id": "P150"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Pimienta Negra?",
+   "debe_contener": [
+    "2026-12-02"
+   ],
+   "id": "P151"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Huevo tengo en inventario?",
+   "debe_contener": [
+    "19"
+   ],
+   "id": "P152"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Desinfectante Pisos?",
+   "debe_contener": [
+    "2026-12-26"
+   ],
+   "id": "P153"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Tomate tengo en inventario?",
+   "debe_contener": [
+    "31.8"
+   ],
+   "id": "P154"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Desinfectante Pisos?",
+   "debe_contener": [
+    "2026-12-26"
+   ],
+   "id": "P155"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Jamon tengo en inventario?",
+   "debe_contener": [
+    "20.3"
+   ],
+   "id": "P156"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Crema Para Batir?",
+   "debe_contener": [
+    "2026-11-28"
+   ],
+   "id": "P157"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Pescado tengo en inventario?",
+   "debe_contener": [
+    "48.9"
+   ],
+   "id": "P158"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Crema Para Batir?",
+   "debe_contener": [
+    "2026-11-28"
+   ],
+   "id": "P159"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Limon tengo en inventario?",
+   "debe_contener": [
+    "7.5"
+   ],
+   "id": "P160"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Avena En Hojuelas?",
+   "debe_contener": [
+    "2026-11-28"
+   ],
+   "id": "P161"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Cebolla tengo en inventario?",
+   "debe_contener": [
+    "44.4"
+   ],
+   "id": "P162"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Avena En Hojuelas?",
+   "debe_contener": [
+    "2026-11-28"
+   ],
+   "id": "P163"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Cilantro tengo en inventario?",
+   "debe_contener": [
+    "20.4"
+   ],
+   "id": "P164"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Pollo Pechuga?",
+   "debe_contener": [
+    "2026-12-12"
+   ],
+   "id": "P165"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Lomo tengo en inventario?",
+   "debe_contener": [
+    "23.7"
+   ],
+   "id": "P166"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Pollo Pechuga?",
+   "debe_contener": [
+    "2026-12-12"
+   ],
+   "id": "P167"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Papa tengo en inventario?",
+   "debe_contener": [
+    "40.1"
+   ],
+   "id": "P168"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Tomate Cherry?",
+   "debe_contener": [
+    "2027-01-09"
+   ],
+   "id": "P169"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Palta tengo en inventario?",
+   "debe_contener": [
+    "35.5"
+   ],
+   "id": "P170"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Tomate Cherry?",
+   "debe_contener": [
+    "2027-01-09"
+   ],
+   "id": "P171"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Pollo tengo en inventario?",
+   "debe_contener": [
+    "22.5"
+   ],
+   "id": "P172"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Salmón Noruego?",
+   "debe_contener": [
+    "2026-12-23"
+   ],
+   "id": "P173"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Vino Blanco tengo en inventario?",
+   "debe_contener": [
+    "11.2"
+   ],
+   "id": "P174"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Salmón Noruego?",
+   "debe_contener": [
+    "2026-12-23"
+   ],
+   "id": "P175"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Harina tengo en inventario?",
+   "debe_contener": [
+    "18.8"
+   ],
+   "id": "P176"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Leche Entera?",
+   "debe_contener": [
+    "2026-11-26"
+   ],
+   "id": "P177"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Harina de Trigo tengo en inventario?",
+   "debe_contener": [
+    "59.8"
+   ],
+   "id": "P178"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Leche Entera?",
+   "debe_contener": [
+    "2026-11-26"
+   ],
+   "id": "P179"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Aceite de Oliva tengo en inventario?",
+   "debe_contener": [
+    "35.4"
+   ],
+   "id": "P180"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Huevos Extra?",
+   "debe_contener": [
+    "2027-01-03"
+   ],
+   "id": "P181"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Pechuga de Pavo tengo en inventario?",
+   "debe_contener": [
+    "51.1"
+   ],
+   "id": "P182"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Huevos Extra?",
+   "debe_contener": [
+    "2027-01-03"
+   ],
+   "id": "P183"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Harina de Maiz tengo en inventario?",
+   "debe_contener": [
+    "79.1"
+   ],
+   "id": "P184"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Queso Crema?",
+   "debe_contener": [
+    "2026-12-19"
+   ],
+   "id": "P185"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Filete de Merluza tengo en inventario?",
+   "debe_contener": [
+    "31.8"
+   ],
+   "id": "P186"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Queso Crema?",
+   "debe_contener": [
+    "2026-12-19"
+   ],
+   "id": "P187"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Costilla de Cerdo tengo en inventario?",
+   "debe_contener": [
+    "78.2"
+   ],
+   "id": "P188"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Cebolla Morada?",
+   "debe_contener": [
+    "2027-01-09"
+   ],
+   "id": "P189"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Sulfato de Cobre tengo en inventario?",
+   "debe_contener": [
+    "56.5"
+   ],
+   "id": "P190"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Cebolla Morada?",
+   "debe_contener": [
+    "2027-01-09"
+   ],
+   "id": "P191"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Huevo de Codorniz tengo en inventario?",
+   "debe_contener": [
+    "38.4"
+   ],
+   "id": "P192"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Cilantro Fresco?",
+   "debe_contener": [
+    "2027-01-14"
+   ],
+   "id": "P193"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Cloruro de Sodio tengo en inventario?",
+   "debe_contener": [
+    "118"
+   ],
+   "id": "P194"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Cilantro Fresco?",
+   "debe_contener": [
+    "2027-01-14"
+   ],
+   "id": "P195"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Detergente Lavaplatos tengo en inventario?",
+   "debe_contener": [
+    "23"
+   ],
+   "id": "P196"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Cuándo vence el lote más próximo de Mantequilla Sin Sal?",
+   "debe_contener": [
+    "2026-11-28"
+   ],
+   "id": "P197"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto 10M Platos tengo en inventario?",
+   "debe_contener": [
+    "10.8"
+   ],
+   "id": "P198"
+  },
+  {
+   "tema": "fecha_producto",
+   "pregunta": "¿Qué día caduca Mantequilla Sin Sal?",
+   "debe_contener": [
+    "2026-11-28"
+   ],
+   "id": "P199"
+  },
+  {
+   "tema": "stock_producto",
+   "pregunta": "¿Cuánto Remolacha tengo en inventario?",
+   "debe_contener": [
+    "48.6"
+   ],
+   "id": "P200"
+  }
+ ]
+}

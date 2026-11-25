@@ -130,8 +130,8 @@ class BaseAgent(ABC):
 class RecipeAgent(BaseAgent):
     """Agente especializado en recetas."""
 
-    def __init__(self, tools: List[Any] = None):
-        super().__init__(AgentRole.RECIPE, tools)
+    def __init__(self, tools: Optional[List[Any]] = None, llm: Any = None):
+        super().__init__(AgentRole.RECIPE, tools, llm)
         self.keywords = ["receta", "reseta", "cocinar", "preparar", "ingredientes", "plato", "encuentra"]
 
     @property

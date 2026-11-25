@@ -24,6 +24,8 @@ class AIProvider(Enum):
     OPENAI = "openai"
     OPENCODE = "opencode"
     OLLAMA = "ollama"
+    SENSENOVA = "sensenova"
+    CUSTOM = "custom"
 
 
 class ConfigManager:
@@ -37,6 +39,8 @@ class ConfigManager:
         AIProvider.OPENAI: "openai_key",
         AIProvider.OPENCODE: "opencode_key",
         AIProvider.OLLAMA: "ollama_key",
+        AIProvider.SENSENOVA: "sensenova_key",
+        AIProvider.CUSTOM: "custom_key",
     }
 
     PROVIDER_NAMES: Dict[AIProvider, str] = {
@@ -47,6 +51,8 @@ class ConfigManager:
         AIProvider.OPENAI: "OpenAI (GPT-4, GPT-3.5)",
         AIProvider.OPENCODE: "OpenCode (Big Pickle)",
         AIProvider.OLLAMA: "Ollama (Local)",
+        AIProvider.SENSENOVA: "SenseNova",
+        AIProvider.CUSTOM: "Compatible OpenAI (URL propia)",
     }
 
     PROVIDER_MODELS: Dict[AIProvider, List[str]] = {
@@ -57,6 +63,8 @@ class ConfigManager:
         AIProvider.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
         AIProvider.OPENCODE: ["big-pickle", "open-code-v1", "code-assistant"],
         AIProvider.OLLAMA: ["llama3.2", "llama3.1", "mistral", "codellama", "phi3", "gemma2"],
+        AIProvider.SENSENOVA: [os.environ.get("CHEFCHAT_SENSENOVA_MODEL", "sensenova-model")],
+        AIProvider.CUSTOM: [os.environ.get("CHEFCHAT_CUSTOM_MODEL", "deepseek-v4.1-flash-free")],
     }
 
     @staticmethod
@@ -77,12 +85,16 @@ class ConfigManager:
             AIProvider.OPENAI: "CHEFCHAT_OPENAI_API_KEY",
             AIProvider.OPENCODE: "CHEFCHAT_OPENCODE_API_KEY",
             AIProvider.OLLAMA: "CHEFCHAT_OLLAMA_API_KEY",
+            AIProvider.SENSENOVA: "CHEFCHAT_SENSENOVA_API_KEY",
+            AIProvider.CUSTOM: "CHEFCHAT_CUSTOM_API_KEY",
         }
         env_var = env_var_map.get(provider)
         if env_var:
             env_key = os.environ.get(env_var)
             if env_key:
                 return env_key
+        if provider == AIProvider.CUSTOM and os.environ.get("HMS_API_KEY"):
+            return os.environ["HMS_API_KEY"]
         
         # Fallback to keyring
         key_id = ConfigManager.PROVIDER_KEY_IDS[provider]
